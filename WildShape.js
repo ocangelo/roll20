@@ -46,12 +46,57 @@ ShapeShifter = {
     ...
 };
 */
+
+var MenuHelper = MenuHelper || (function () {
+    var MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px;";
+    var BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; float: right;";
+    var LIST_STYLE = 'list-style: none; padding: 0; margin: 0;';
+    var ITEM_STYLE = "";
+
+    makeTitle = (title, title_tag) => {
+        title_tag = (title_tag && title_tag !== '') ? title_tag : 'h3';
+        return '<'+title_tag+' style="margin-bottom: 10px;">'+title+'</'+title_tag+'>';
+    };
+
+    makeButton = (title, href, addStyle, style, alt) => {
+        return '<a style="'+(style || BUTTON_STYLE) + addStyle +'" href="'+href+'" title="'+alt+'">'+title+'</a>';
+    };
+
+    makeList = (items, addListStyle, addItemStyle, listStyle, itemStyle) => {
+        let list = '<ul style="'+(listStyle || LIST_STYLE)+addListStyle+'">';
+        items.forEach((item) => {
+            list += '<li style="'+(itemStyle || ITEM_STYLE)+addItemStyle+'">'+item+'</li>';
+        });
+        list += '</ul>';
+        return list;
+    };
+
+    makeAndSendMenu = (apiName, contents, title, settings) => {
+        settings = settings || {};
+        settings.whisper = (typeof settings.whisper === 'undefined' || settings.whisper === 'gm') ? '/w gm ' : '';
+        title = (title && title != '') ? makeTitle(title, settings.title_tag || '') : '';
+        sendChat(apiName, settings.whisper + '<div style="'+MENU_STYLE+'">'+title+contents+'</div>', null, {noarchive:true});
+    };
+
+    return {
+      MENU_STYLE,
+      BUTTON_STYLE,
+      LIST_STYLE,
+      ITEM_STYLE,
+      makeTitle,
+      makeButton,
+      makeList,
+      makeAndSendMenu,
+    }
+})();
+
 var WildShape = WildShape || (function() {
     'use strict';
 
     const API_NAME = "WildShape";
     const API_VERSION = "0.1";
-    const API_USAGE = "!ws shapeName";
+    const API_CMD = "!ws";
+    const API_USAGE = API_CMD + " [shapeName, config [reset, import, export]]";
     const API_STATENAME = "WILDSHAPE";
     const API_DEBUG = false;
 
@@ -89,11 +134,6 @@ var WildShape = WildShape || (function() {
             }
         }
     }
-    
-    // initialize default IDs
-    _.each(ShapeShifters, function(s) {
-        s.default.id = findObjs({ type: 'character', name: s.default.name })[0].get('id');
-    });
 
     function getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
@@ -136,48 +176,6 @@ var WildShape = WildShape || (function() {
         return 1 + (targetSize ? Math.max(_.indexOf(CreatureSizes, targetSize.toLowerCase()), 0) : 0);
     };
     
-    on("chat:message", function (msg) {
-        if (msg.type === "api" && msg.selected)
-        {
-            const parts = msg.content.split(/ (.*)/).filter(x => x);
-            
-            if (parts[0].toLowerCase() === "!ws")  {
-                 if (!msg.selected || msg.selected.length < 1)
-                {
-                    sendChat(API_NAME, "Please select a ShapeShifter Token and specify a target shape, usage: " + API_USAGE);
-                    return;
-                }
-
-                let targetDruidShape = null;
-                _.each(msg.selected, function(o) {
-                    const obj = findShapeShifter(o);
-                    if(obj)
-                    {
-                        if (parts.length === 2 && parts[1].toLowerCase() != "default")
-                        {
-                            const targetDruidShape = obj.target.shapes[parts[1]];
-                            if (targetDruidShape)
-                            {
-                                sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
-                                shapeShift(obj.token, obj.target.default, targetDruidShape);
-                            }
-                            else
-                            {
-                                sendChat(API_NAME, "ERROR: Cannot find shape " + parts[1] + " for ShapeShifter: " + obj.tokenName);
-                            }
-                        }
-                        else
-                        {
-                            sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
-                            shapeShift(obj.token, obj.target.default);
-                        }
-                    }
-                });
-            }
-        }
-    });
-
-
     function copyAttribute(fromId, toId, fromAttrName, onlyIfGreater = true, createAttr = false, toPrefix, toSuffix)
     {
         if(!toPrefix)
@@ -207,7 +205,7 @@ var WildShape = WildShape || (function() {
         }
     	else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
             toAttr.set("current", fromAttr);
-    }
+    };
 
     function shapeShift(selectedToken, defaultShapeObj, targetShapeObj)
     {
@@ -330,39 +328,88 @@ var WildShape = WildShape || (function() {
                 });
 	        });
         }
-    },
+    };
 
-    sendConfigMenu = (first) => {
-        let commandButton = makeButton('!'+state[state_name].config.command, '!' + state[state_name].config.command + ' config command|?{Command (without !)}', buttonStyle);
-        let userAllowedButton = makeButton(state[state_name].config.userAllowed, '!' + state[state_name].config.command + ' config userAllowed|'+!state[state_name].config.userAllowed, buttonStyle);
-        let userToggleButton = makeButton(state[state_name].config.userToggle, '!' + state[state_name].config.command + ' config userToggle|'+!state[state_name].config.userToggle, buttonStyle);
-        let toGMButton = makeButton(state[state_name].config.sendOnlyToGM, '!' + state[state_name].config.command + ' config sendOnlyToGM|'+!state[state_name].config.sendOnlyToGM, buttonStyle);
-        let statusChangeButton = makeButton(state[state_name].config.showDescOnStatusChange, '!' + state[state_name].config.command + ' config showDescOnStatusChange|'+!state[state_name].config.showDescOnStatusChange, buttonStyle);
-        let showIconButton = makeButton(state[state_name].config.showIconInDescription, '!' + state[state_name].config.command + ' config showIconInDescription|'+!state[state_name].config.showIconInDescription, buttonStyle);
+    const handleInput = (msg) => {
+        if (msg.type === "api")
+        {
+            const parts = msg.content.split(/ (.*)/).filter(x => x);
+            
+            if (parts[0].toLowerCase() === "!ws")
+            {
+                const params = parts[1];
+                const paramsParts = params.split(' ').filter(x => x);
+                if(paramsParts[0].toLowerCase() === 'config')
+                {
+                    sendConfigMenu();
+                }
+                else if(paramsParts[0].toLowerCase() === 'help')
+                {
+                    sendChat(API_NAME, API_USAGE);
+                }
+                else
+                {
+                    if (!msg.selected)
+                    {
+                        sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
+                    
+                        return;
+                    }
+                    
+                    let targetDruidShape = null;
+                    _.each(msg.selected, function(o) 
+                    {
+                        const obj = findShapeShifter(o);
+                        if(obj)
+                        {
+                            if (params.toLowerCase() != "default")
+                            {
+                                const targetDruidShape = obj.target.shapes[params];
+                                if (targetDruidShape)
+                                {
+                                    sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
+                                    shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                }
+                                else
+                                {
+                                    sendChat(API_NAME, "ERROR: Cannot find shape " + params + " for ShapeShifter: " + obj.tokenName);
+                                }
+                            }
+                            else
+                            {
+                                sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
+                                shapeShift(obj.token, obj.target.default);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    };
+
+    const sendConfigMenu = (first) => {
+        let commandButton = MenuHelper.makeButton("Command", "!ws help");
 
         let listItems = [
-            '<span style="float: left">Command:</span> ' + commandButton,
-            '<span style="float: left">Player Show:</span> '+userAllowedButton,
-            '<span style="float: left">Player Toggle:</span> '+userToggleButton,
-            '<span style="float: left">Show on Status Change:</span> '+statusChangeButton,
-            '<span style="float: left">Display icon in chat:</span> '+showIconButton
+            '<span style="float: left">Command:</span> ' + commandButton
         ];
 
-        let configConditionsButton = makeButton('Conditions Config', '!' + state[state_name].config.command + ' config-conditions', buttonStyle + ' width: 100%');
-        let resetButton = makeButton('Reset Config', '!' + state[state_name].config.command + ' reset', buttonStyle + ' width: 100%');
+        let configButton = MenuHelper.makeButton('Config', API_CMD + ' config', ' width: 100%');
+        let resetButton = MenuHelper.makeButton('Reset Config', API_CMD + ' config reset', ' width: 100%');
+        let exportButton = MenuHelper.makeButton('Export Config', API_CMD + ' config export', ' width: 100%');
+        let importButton = MenuHelper.makeButton('Import Config', API_CMD + ' config import ?{Config}', ' width: 100%');
 
-        let exportButton = makeButton('Export Config', '!' + state[state_name].config.command + ' config export', buttonStyle + ' width: 100%');
-        let importButton = makeButton('Import Config', '!' + state[state_name].config.command + ' config import ?{Config}', buttonStyle + ' width: 100%');
+        let title_text = (first) ? API_NAME+' First Time Setup' : API_NAME+' Config';
+        let contents = MenuHelper.makeList(listItems, ' overflow:hidden;', ' overflow: hidden')
+                      +'<hr>'+configButton+'<hr><p style="font-size: 80%">You can always open this config by typing `'+API_CMD+' config`.</p><hr>'
+                      +exportButton+importButton+resetButton;
+        MenuHelper.makeAndSendMenu(API_NAME, contents, title_text)
+    };
 
-        let title_text = (first) ? script_name+' First Time Setup' : script_name+' Config';
-        let contents = makeList(listItems, listStyle + ' overflow:hidden;', 'overflow: hidden')+'<hr>'+configConditionsButton+'<hr><p style="font-size: 80%">You can always come back to this config by typing `!'+state[state_name].config.command+' config`.</p><hr>'+exportButton+importButton+resetButton;
-        makeAndSendMenu(contents, title_text)
-    },
-
-    setDefaults = (reset) => {
+    const setDefaults = (reset) => {
         const defaults = {
             config: {
-                command: API_USAGE
+                command: API_NAME
             },
 
             ShapeShifters :
@@ -371,7 +418,7 @@ var WildShape = WildShape || (function() {
             }
         }
 
-        if (!state[API_STATENAME].config) {
+        if (!state[API_STATENAME].config || reset) {
             state[API_STATENAME].config = defaults.config;
         }
         else {
@@ -380,36 +427,38 @@ var WildShape = WildShape || (function() {
             }
         }
 
-        if (!state[API_STATENAME].ShapeShifters || typeof state[API_STATENAME].ShapeShifters !== 'object')
+        if (!state[API_STATENAME].ShapeShifters || typeof state[API_STATENAME].ShapeShifters !== 'object' || reset)
         {
             state[API_STATENAME].ShapeShifters = defaults.ShapeShifters;
+            
+            // initialize default IDs
+            _.each(state[API_STATENAME].ShapeShifters, function(s) {
+                s.default.id = findObjs({ type: 'character', name: s.default.name })[0].get('id');
+            });
         }
 
-        if (!state[API_STATENAME].config.hasOwnProperty('firsttime') && !reset) {
+        if (!state[API_STATENAME].config.hasOwnProperty('firsttime')) {
             sendConfigMenu(true);
             state[API_STATENAME].config.firsttime = false;
-        }
+        }            
     };
 
-    checkInstall = () => {
+    const checkInstall = () => {
         if(!_.has(state, API_STATENAME)){
             state[API_STATENAME] = state[API_STATENAME] || {};
         }
-        setDefaults();
+        setDefaults(true);
 
         log(API_NAME + ' Ready! Command: ' + API_USAGE);
     };
     
+    const registerEventHandlers = () => {
+        on('chat:message', handleInput);
+    };
+    
     return {
         checkInstall,
-        ObserveTokenChange: observeTokenChange,
-        registerEventHandlers,
-        getConditions,
-        getConditionByName,
-        handleConditions,
-        sendConditionToChat,
-        getIcon,
-        version
+	    registerEventHandlers,
     };
 })();
 
