@@ -100,41 +100,6 @@ var WildShape = WildShape || (function() {
     const API_STATENAME = "WILDSHAPE";
     const API_DEBUG = false;
 
-    const ShapeShifters = {
-        Yunith: {
-            default: {
-                name: "Druid Test",
-                shapesPrefix: "Druid-",
-            },
-            
-            shapes: {
-                GiantToad: {
-                    name: "Giant Toad",
-                    size: "Large"
-                }
-            }
-        },
-        
-        Kamlo: {
-            default: {
-                name: "Copy of Kamlo Cortes",
-                shapesPrefix: "Kamlo-",
-            },
-            
-            shapes: {
-                "Giant Toad": {
-                    name: "Giant Toad",
-                    size: "Large"
-                },
-                
-                "Adult Black Dragon": {
-                    name: "Adult Black Dragon",
-                    size: "Huge"
-                }
-            }
-        }
-    }
-
     function getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
         if(parts) {
@@ -146,7 +111,7 @@ var WildShape = WildShape || (function() {
     function findShapeShifter(selectedToken) {
         let tokenObj = getObj(selectedToken._type, selectedToken._id);
         const name = tokenObj.get("name");
-        const obj = ShapeShifters[name];
+        const obj = state[API_STATENAME].ShapeShifters[name];
         if (obj)
         {
             return {
@@ -337,54 +302,78 @@ var WildShape = WildShape || (function() {
             
             if (parts[0].toLowerCase() === "!ws")
             {
-                const params = parts[1];
-                const paramsParts = params.split(' ').filter(x => x);
-                if(paramsParts[0].toLowerCase() === 'config')
-                {
-                    sendConfigMenu();
-                }
-                else if(paramsParts[0].toLowerCase() === 'help')
-                {
-                    sendChat(API_NAME, API_USAGE);
-                }
-                else
+                if(parts.length === 1)
                 {
                     if (!msg.selected)
                     {
-                        sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
-                    
+                        sendChat(API_NAME, "Please select a token then run: " + API_CMD);
                         return;
                     }
-                    
-                    let targetDruidShape = null;
-                    _.each(msg.selected, function(o) 
+
+                    const obj = findShapeShifter(msg.selected[0]);
+                    sendShapeShiftMenu(obj.tokenName, obj.target.shapes);
+                    return;
+                }
+                else
+                {
+                    const params = parts[1];
+                    const paramsParts = params.split(' ').filter(x => x);
+                    if(paramsParts[0].toLowerCase() === 'config')
                     {
-                        const obj = findShapeShifter(o);
-                        if(obj)
+                        sendConfigMenu();
+                    }
+                    else if(paramsParts[0].toLowerCase() === 'help')
+                    {
+                        sendChat(API_NAME, API_USAGE);
+                    }
+                    else
+                    {
+                        if (!msg.selected)
                         {
-                            if (params.toLowerCase() != "default")
+                            sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
+                            return;
+                        }
+                        
+                        let targetDruidShape = null;
+                        _.each(msg.selected, function(o) 
+                        {
+                            const obj = findShapeShifter(o);
+                            if(obj)
                             {
-                                const targetDruidShape = obj.target.shapes[params];
-                                if (targetDruidShape)
+                                if (params.toLowerCase() != "default")
                                 {
-                                    sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
-                                    shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                    const targetDruidShape = obj.target.shapes[params];
+                                    if (targetDruidShape)
+                                    {
+                                        sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
+                                        shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                    }
+                                    else
+                                    {
+                                        sendChat(API_NAME, "ERROR: Cannot find shape " + params + " for ShapeShifter: " + obj.tokenName);
+                                    }
                                 }
                                 else
                                 {
-                                    sendChat(API_NAME, "ERROR: Cannot find shape " + params + " for ShapeShifter: " + obj.tokenName);
+                                    sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
+                                    shapeShift(obj.token, obj.target.default);
                                 }
                             }
-                            else
-                            {
-                                sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
-                                shapeShift(obj.token, obj.target.default);
-                            }
-                        }
-                    });
+                        });
+                    }
                 }
             }
         }
+    };
+
+    const sendShapeShiftMenu = (name, shapes) => {
+        let buttons = MenuHelper.makeButton(name, "!ws default", ' width: 100%');;
+        let listItems = [];
+        _.each(Object.keys(shapes), function(key) {
+            buttons += MenuHelper.makeButton(key, "!ws " + key, ' width: 100%');
+        });
+        
+        MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + name + ' ShapeShift')
     };
 
     const sendConfigMenu = (first) => {
@@ -409,12 +398,43 @@ var WildShape = WildShape || (function() {
     const setDefaults = (reset) => {
         const defaults = {
             config: {
-                command: API_NAME
+                command: API_CMD
             },
 
             ShapeShifters :
             {
-
+              Yunith: {
+                default: {
+                  name: "Druid Test",
+                  shapesPrefix: "Druid-",
+                },
+                  
+                shapes: {
+                    GiantToad: {
+                        name: "Giant Toad",
+                        size: "Large"
+                    }
+                }
+              },
+        
+              Kamlo: {
+                  default: {
+                      name: "Copy of Kamlo Cortes",
+                      shapesPrefix: "Kamlo-",
+                  },
+                  
+                  shapes: {
+                      "Giant Toad": {
+                          name: "Giant Toad",
+                          size: "Large"
+                      },
+                      
+                      "Adult Black Dragon": {
+                          name: "Adult Black Dragon",
+                          size: "Huge"
+                      }
+                  }
+              }
             }
         }
 
@@ -449,7 +469,7 @@ var WildShape = WildShape || (function() {
         }
         setDefaults(true);
 
-        log(API_NAME + ' Ready! Command: ' + API_USAGE);
+        log(API_NAME + ' Ready! Usage: ' + API_USAGE);
     };
     
     const registerEventHandlers = () => {
@@ -458,7 +478,7 @@ var WildShape = WildShape || (function() {
     
     return {
         checkInstall,
-	    registerEventHandlers,
+	      registerEventHandlers,
     };
 })();
 
