@@ -49,7 +49,7 @@ ShapeShifter = {
 
 var MenuHelper = MenuHelper || (function () {
     var MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px;";
-    var BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; float: right;";
+    var BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center;";
     var LIST_STYLE = 'list-style: none; padding: 0; margin: 0;';
     var ITEM_STYLE = "";
 
@@ -59,8 +59,12 @@ var MenuHelper = MenuHelper || (function () {
     };
 
     makeButton = (title, href, addStyle, style, alt) => {
-        return '<a style="'+(style || BUTTON_STYLE) + addStyle +'" href="'+href+'" title="'+alt+'">'+title+'</a>';
+        return '<a style="'+(style || BUTTON_STYLE) + addStyle +'" href="'+href+'" title="'+(alt || href)+'">'+title+'</a>';
     };
+
+    makeListItemButton = (itemName, buttonName, href, addButtonStyle, buttonStyle, alt) => {
+        return '<span style="float: left">'+itemName+':</span> ' + makeButton(buttonName, href,  "float: right;" + addButtonStyle, buttonStyle, alt);
+    }
 
     makeList = (items, addListStyle, addItemStyle, listStyle, itemStyle) => {
         let list = '<ul style="'+(listStyle || LIST_STYLE)+addListStyle+'">';
@@ -70,12 +74,13 @@ var MenuHelper = MenuHelper || (function () {
         list += '</ul>';
         return list;
     };
+    
 
-    makeAndSendMenu = (apiName, contents, title, settings) => {
+    makeAndSendMenu = (who, contents, title, settings) => {
         settings = settings || {};
-        settings.whisper = (typeof settings.whisper === 'undefined' || settings.whisper === 'gm') ? '/w gm ' : '';
+        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
         title = (title && title != '') ? makeTitle(title, settings.title_tag || '') : '';
-        sendChat(apiName, settings.whisper + '<div style="'+MENU_STYLE+'">'+title+contents+'</div>', null, {noarchive:true});
+        sendChat(who, settings.whisper + '<div style="'+MENU_STYLE+'">'+title+contents+'</div>', null, {noarchive:true});
     };
 
     return {
@@ -85,10 +90,12 @@ var MenuHelper = MenuHelper || (function () {
       ITEM_STYLE,
       makeTitle,
       makeButton,
+      makeListItemButton,
       makeList,
       makeAndSendMenu,
     }
 })();
+
 
 var WildShape = WildShape || (function() {
     'use strict';
@@ -100,6 +107,33 @@ var WildShape = WildShape || (function() {
     const API_STATENAME = "WILDSHAPE";
     const API_DEBUG = false;
 
+    const sendShapeShiftMenu = (name, shapes) => {
+        let buttons = MenuHelper.makeButton(name, "!ws default", ' width: 100%');;
+        let listItems = [];
+        _.each(Object.keys(shapes), function(key) {
+            buttons += MenuHelper.makeButton(key, "!ws " + key, ' width: 100%');
+        });
+        
+        MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + name + ' ShapeShift')
+    };
+
+    const sendConfigMenu = (first) => {
+        let listItems = [
+            MenuHelper.makeListItemButton("Display Command Usage", "Help", "!ws help"),
+        ];
+
+        let configButton = MenuHelper.makeButton('Config', API_CMD + ' config', ' width: 100%');
+        let resetButton = MenuHelper.makeButton('Reset Config', API_CMD + ' config reset', ' width: 100%');
+        let exportButton = MenuHelper.makeButton('Export Config', API_CMD + ' config export', ' width: 100%');
+        let importButton = MenuHelper.makeButton('Import Config', API_CMD + ' config import ?{Config}', ' width: 100%');
+
+        let title_text = (first) ? API_NAME+' First Time Setup' : API_NAME+' Config';
+        let contents = MenuHelper.makeList(listItems, ' overflow:hidden;', ' overflow: hidden')
+                      +'<hr>'+configButton+'<hr><p style="font-size: 80%">You can always open this config by typing `'+API_CMD+' config`.</p><hr>'
+                      +exportButton+importButton+resetButton;
+        MenuHelper.makeAndSendMenu(API_NAME, contents, title_text)
+    };
+    
     function getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
         if(parts) {
@@ -107,6 +141,136 @@ var WildShape = WildShape || (function() {
         }
         return;
     };
+
+
+    const duplicateCharacter = (o) => {
+        const simpleObj = (o)=>JSON.parse(JSON.stringify(o));
+        
+        let c = simpleObj(o.character);
+        let oldCid = o.character.id;
+        delete c.id;
+        c.name=`(COPY) ${c.name}`;
+        c.avatar=getCleanImgsrc(c.avatar)||'';
+
+        let newC = createObj('character',c);
+        o.token.set('represents',newC.id);
+        setDefaultTokenForCharacter(newC,o.token);
+        o.token.set('represents',oldCid);
+
+        _.each(findObjs({type:'attribute',characterid:oldCid}),(a)=>{
+            let sa = simpleObj(a);
+            delete sa.id;
+            delete sa._type;
+            delete sa._characterid;
+            sa.characterid = newC.id;
+            createObj('attribute',sa);
+        });
+        _.each(findObjs({type:'ability',characterid:oldCid}),(a)=>{
+            let sa = simpleObj(a);
+            delete sa.id;
+            delete sa._type;
+            delete sa._characterid;
+            sa.characterid = newC.id;
+            createObj('ability',sa);
+        });
+    };
+    
+    /*
+                    _.chain(msg.selected)
+                    .map((o)=>getObj('graphic',o._id))
+                    .reject(_.isUndefined)
+                    .map(o=>({token: o, character: getObj('character',o.get('represents'))}))
+                    .reject(o=>_.isUndefined(o.character))
+                    .tap(o=>{
+                        if(!o.length){
+                            sendChat('',`/w gm <div style="color: #993333;font-weight:bold;">Please select one or more tokens which represent characters.</div>`);
+                        } else {
+                            sendChat('',`/w gm <div style="color: #993333;font-weight:bold;">Duplicating: ${o.map((obj)=>obj.character.get('name')).join(', ')}</div>`);
+                        }
+                    })
+                    .each(duplicateCharacter);
+    */
+    const getCharactersWithAttrByName = function(attributeName){
+        /* start the chain with all the attribute objects named 'player-name' */
+        return _
+            .chain(filterObjs((o)=>{
+                return (o.get('type')==='attribute' &&
+                  o.get('name')===attributeName);
+            }))
+            
+            /* IN: Array of Attribute Objects */
+            /* extract the characterid from each */
+            .reduce((m,o)=>{
+              let obj={};
+              obj.cid=o.get('characterid');
+              obj[attributeName]=o;
+              m.push(obj);
+              return m;
+              },
+              []
+            )
+            
+            /* IN: Array of Objects with 
+                 * Character ID in property cid 
+                 * attribute in [attributeName]
+            */
+            /* add characters to the objects */
+            .map((o)=>{
+              o.char=getObj('character',o.cid);
+              return o;
+            })
+            
+            /* IN: Array of Objects with 
+                 * Character ID in property cid 
+                 * attribute in [attributeName]
+                 * character in property char
+            */
+            /* remove any entries that didn't have Characters */
+            .reject( (o)=> {return _.isUndefined(o.char);} )
+            
+            /* IN: Array of Character Objects */
+            /* Unwrap Chain and return the array */
+            .value();
+    };
+
+/*var charsWithPN = getCharactersWithAttrByName('player-name');
+_.each(charsWithPN,(o)=>{
+  log(`Character ${o.char.get('name')} has player-name of ${o['player-name'].get('current')}/${o['player-name'].get('max')}`);
+});*/
+    
+    function getFolderObjects(objs) {
+        return _.map(objs, function(o) {
+            if (_.isString(o)) {
+                return getObj('handout', o) || getObj('character', o);
+            }
+            if (_.isArray(o.i)) {
+                o.i = getFolderObjects(o.i);
+                return o;
+            }
+        });
+    }
+    
+    function getObjectFromFolder(path, folderData, getFolder) {
+        if (path.indexOf('.') < 0) {
+            if (getFolder) {
+                return _.find(folderData, (o) => o.n && o.n.toLowerCase() === path.toLowerCase()).i;
+            }
+            return _.find(folderData, (o) => o.get && o.get('name').toLowerCase() === path.toLowerCase());
+        }
+        path = path.split('.');
+        var folder = path.shift();
+        path = path.join('.');
+        folderData = _.find(folderData, (o) => o.n && o.n.toLowerCase() === folder.toLowerCase());
+        return getObjectFromFolder(path, folderData.i);
+    }
+
+/*
+// usage:
+var folderData = getFolderObjects(JSON.parse(Campaign().get('journalfolder')));
+var goblin13 = getObjectFromFolder('encounters.forest.level2.goblin #13', folderData);
+var level2PlainsMonsters = getObjectFromFolder('encounters.plains.level2', folderData, true);
+var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
+*/
 
     function findShapeShifter(selectedToken) {
         let tokenObj = getObj(selectedToken._type, selectedToken._id);
@@ -298,11 +462,13 @@ var WildShape = WildShape || (function() {
     const handleInput = (msg) => {
         if (msg.type === "api")
         {
-            const parts = msg.content.split(/ (.*)/).filter(x => x);
+            //const parts = msg.content.split(/ (.*)/).filter(x => x);
             
-            if (parts[0].toLowerCase() === "!ws")
+            if (message.content.indexOf(API_CMD) == 0)
             {
-                if(parts.length === 1)
+                const args = msg.content.split(' ').filter(x => x);
+                args.shift(); // remove cmd
+                if(args.length == 0)
                 {
                     if (!msg.selected)
                     {
@@ -315,84 +481,169 @@ var WildShape = WildShape || (function() {
                     return;
                 }
                 else
-                {
-                    const params = parts[1];
-                    const paramsParts = params.split(' ').filter(x => x);
-                    if(paramsParts[0].toLowerCase() === 'config')
+                {          
+                    const cmd = args.shift();
+                    switch (cmd)
                     {
-                        sendConfigMenu();
-                    }
-                    else if(paramsParts[0].toLowerCase() === 'help')
-                    {
-                        sendChat(API_NAME, API_USAGE);
-                    }
-                    else
-                    {
-                        if (!msg.selected)
+                        case 'config':
                         {
-                            sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
-                            return;
-                        }
-                        
-                        let targetDruidShape = null;
-                        _.each(msg.selected, function(o) 
-                        {
-                            const obj = findShapeShifter(o);
-                            if(obj)
+                            switch (args.shift())
                             {
-                                if (params.toLowerCase() != "default")
+                                case "add":
                                 {
-                                    const targetDruidShape = obj.target.shapes[params];
-                                    if (targetDruidShape)
+                                    switch (args.shift())
                                     {
-                                        sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
-                                        shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                        case "shifter":
+                                        {
+                                            const targetName = args.shift();
+                                            const targetPrefix = args.shift();
+                                            if (targetName)
+                                            {
+                                                let target = state[API_STATENAME].ShapeShifters[targetName];
+                                                if(!target)
+                                                {
+                                                    target = {
+                                                        default: {
+                                                          name: targetName,
+                                                          shapesPrefix: targetPrefix || '',
+                                                        },
+                                                          
+                                                        shapes: {}
+                                                    }
+                                                    state[API_STATENAME].ShapeShifters[targetName] = target;
+                                                }
+                                                else
+                                                {
+                                                    sendChat(API_NAME, "ERROR: Trying to add ShapeShifter " + targetName + " which already exists");
+                                                }
+                                            }
+                                        }
+                                        break;
+
+                                        case "shape":
+                                        {
+                                            const targetName = args.shift();
+                                            const targetShape = args.shift();
+                                            let target = state[API_STATENAME].ShapeShifters[targetName];                    
+                                            if (target) 
+                                            {
+                                                target.shapes[targetShape] = {};
+                                            }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to add shape to ShapeShifter " + targetName + " which doesn't exist");
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }                                
+                                break;
+
+                                case "remove":
+                                {
+                                    switch (args.shift())
+                                    {
+                                        case "shifter":
+                                        {
+                                            const targetName = args.shift();
+                                            if (targetName)
+                                            {
+                                                if(state[API_STATENAME].ShapeShifters[targetName])
+                                                {
+                                                    delete state[API_STATENAME].ShapeShifters[targetName];
+                                                }
+                                                else
+                                                {
+                                                    sendChat(API_NAME, "ERROR: Trying to delete ShapeShifter " + targetName + " which doesn't exists");
+                                                }
+                                            }
+                                        }
+                                        break;
+
+                                        case "shape":
+                                        {
+                                            const targetName = args.shift();
+                                            const targetShape = args.shift();
+                                            let target = state[API_STATENAME].ShapeShifters[targetName];                    
+                                            if (target) 
+                                            {
+                                                if (target.shapes[targetShape])
+                                                {
+                                                    delete target.shapes[targetShape];
+                                                }
+                                                else
+                                                {
+                                                    sendChat(API_NAME, "ERROR: Trying to remove shape " + targetShape + " that doesn't exist from ShapeShifter " + targetName);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to remove shape from ShapeShifter " + targetName + " which doesn't exist");
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                break;
+
+                                case "change":
+                                {
+                                }
+                                break;
+                                
+                                default: sendConfigMenu();
+                            }
+                        }
+                        break;
+
+                        case 'help':
+                        {
+                            sendChat(API_NAME, API_USAGE);
+                        }
+                        break;
+
+                        default:
+                        {
+                            // reconstruct target shape name from list of arguments
+                            const targetShapeName = cmd + " " + args.join(' ');
+
+                            if (!msg.selected)
+                            {
+                                sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
+                                return;
+                            }
+                            
+                            let targetDruidShape = null;
+                            _.each(msg.selected, function(o) 
+                            {
+                                const obj = findShapeShifter(o);
+                                if(obj)
+                                {
+                                    if (params.toLowerCase() != "default")
+                                    {
+                                        const targetDruidShape = obj.target.shapes[targetShapeName];
+                                        if (targetDruidShape)
+                                        {
+                                            sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
+                                            shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                        }
+                                        else
+                                        {
+                                            sendChat(API_NAME, "ERROR: Cannot find shape " + targetShapeName + " for ShapeShifter: " + obj.tokenName);
+                                        }
                                     }
                                     else
                                     {
-                                        sendChat(API_NAME, "ERROR: Cannot find shape " + params + " for ShapeShifter: " + obj.tokenName);
+                                        sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
+                                        shapeShift(obj.token, obj.target.default);
                                     }
                                 }
-                                else
-                                {
-                                    sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
-                                    shapeShift(obj.token, obj.target.default);
-                                }
-                            }
-                        });
+                            });
+                        }
                     }
                 }
             }
         }
-    };
-
-    const sendShapeShiftMenu = (name, shapes) => {
-        let buttons = MenuHelper.makeButton(name, "!ws default", ' width: 100%');;
-        let listItems = [];
-        _.each(Object.keys(shapes), function(key) {
-            buttons += MenuHelper.makeButton(key, "!ws " + key, ' width: 100%');
-        });
-        
-        MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + name + ' ShapeShift')
-    };
-
-    const sendConfigMenu = (first) => {
-        let commandButton = MenuHelper.makeButton("Command", "!ws help");
-
-        let listItems = [
-            '<span style="float: left">Command:</span> ' + commandButton
-        ];
-
-        let configButton = MenuHelper.makeButton('Config', API_CMD + ' config', ' width: 100%');
-        let resetButton = MenuHelper.makeButton('Reset Config', API_CMD + ' config reset', ' width: 100%');
-        let exportButton = MenuHelper.makeButton('Export Config', API_CMD + ' config export', ' width: 100%');
-        let importButton = MenuHelper.makeButton('Import Config', API_CMD + ' config import ?{Config}', ' width: 100%');
-
-        let title_text = (first) ? API_NAME+' First Time Setup' : API_NAME+' Config';
-        let contents = MenuHelper.makeList(listItems, ' overflow:hidden;', ' overflow: hidden')
-                      +'<hr>'+configButton+'<hr><p style="font-size: 80%">You can always open this config by typing `'+API_CMD+' config`.</p><hr>'
-                      +exportButton+importButton+resetButton;
-        MenuHelper.makeAndSendMenu(API_NAME, contents, title_text)
     };
 
     const setDefaults = (reset) => {
@@ -481,6 +732,7 @@ var WildShape = WildShape || (function() {
 	      registerEventHandlers,
     };
 })();
+
 
 on('ready', () => { 
     'use strict';
