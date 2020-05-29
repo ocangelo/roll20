@@ -50,8 +50,8 @@ ShapeShifter = {
 var MenuHelper = MenuHelper || (function () {
     var MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px;";
     var BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center;";
-    var LIST_STYLE = 'list-style: none; padding: 0; margin: 0;';
-    var ITEM_STYLE = "";
+    var LIST_STYLE = "list-style: none; padding: 0; margin: 0; overflow:hidden;";
+    var ITEM_STYLE = "overflow:hidden;";
 
     makeTitle = (title, title_tag) => {
         title_tag = (title_tag && title_tag !== '') ? title_tag : 'h3';
@@ -63,7 +63,7 @@ var MenuHelper = MenuHelper || (function () {
     };
 
     makeListItemButton = (itemName, buttonName, href, addButtonStyle, buttonStyle, alt) => {
-        return '<span style="float: left">'+itemName+':</span> ' + makeButton(buttonName, href,  "float: right;" + addButtonStyle, buttonStyle, alt);
+        return '<span style="float: left">'+itemName+'</span> ' + makeButton(buttonName, href,  "float: right;" + addButtonStyle, buttonStyle, alt);
     }
 
     makeList = (items, addListStyle, addItemStyle, listStyle, itemStyle) => {
@@ -75,7 +75,6 @@ var MenuHelper = MenuHelper || (function () {
         return list;
     };
     
-
     makeAndSendMenu = (who, contents, title, settings) => {
         settings = settings || {};
         settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
@@ -102,35 +101,131 @@ var WildShape = WildShape || (function() {
 
     const API_NAME = "WildShape";
     const API_VERSION = "0.1";
-    const API_CMD = "!ws";
-    const API_USAGE = API_CMD + " [shapeName, config [reset, import, export]]";
     const API_STATENAME = "WILDSHAPE";
     const API_DEBUG = false;
+    
+    let API_CMD ={
+        ROOT : "!ws",
+        SEPARATOR : " ",
+        USAGE : "Please select a token then run: !ws",
 
-    const sendShapeShiftMenu = (name, shapes) => {
-        let buttons = MenuHelper.makeButton(name, "!ws default", ' width: 100%');;
-        let listItems = [];
-        _.each(Object.keys(shapes), function(key) {
-            buttons += MenuHelper.makeButton(key, "!ws " + key, ' width: 100%');
+        HELP : "help",
+
+        CONFIG : "config",
+        ADD : "add",
+        REMOVE : "remove",
+        MODIFY : "modify",
+        RESET : "reset",
+        
+        SHOW_SHIFTERS : "showshifters",
+        
+        SHIFTER : "shifter",
+        SHAPE : "shape",
+
+        DEFAULT_SHAPE : "default",
+    }
+    
+    API_CMD["CONFIG_ROOT"]   = API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.CONFIG;
+    API_CMD["CONFIG_ADD"]    = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.ADD + API_CMD.SEPARATOR;
+    API_CMD["CONFIG_REMOVE"] = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.REMOVE + API_CMD.SEPARATOR;
+    API_CMD["CONFIG_MODIFY"] = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.MODIFY + API_CMD.SEPARATOR;
+    API_CMD["CONFIG_RESET"]    = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.RESET;
+    
+    const sendShapeShiftMenu = (shifterKey, shapes) => {
+        let buttons = MenuHelper.makeButton(shifterKey, API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.DEFAULT_SHAPE, ' width: 100%');;
+
+        _.each(shapes, function(value, key) {
+            buttons += MenuHelper.makeButton(key, API_CMD.ROOT + API_CMD.SEPARATOR + key, ' width: 100%');
         });
         
-        MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + name + ' ShapeShift')
+        MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + shifterKey + ' ShapeShift');
     };
 
+    const sendModifyShapeMenu = (shifterKey, shapeKey) => {
+        const cmdShapeModify = API_CMD.CONFIG_MODIFY + API_CMD.SHAPE + API_CMD.SEPARATOR;
+        const cmdShapeRemove = API_CMD.CONFIG_REMOVE + API_CMD.SHAPE + API_CMD.SEPARATOR;
+        const cmdShifterModify = API_CMD.CONFIG_MODIFY + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        
+        const shifter = state[API_STATENAME].ShapeShifters[shifterKey];
+        
+
+        let obj = shifter.shapes[shapeKey];
+        let listItems = [];
+        if(obj)
+        {
+            listItems.push(MenuHelper.makeListItemButton("ID: &lt;" + shapeKey + "&gt;", "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
+            listItems.push(MenuHelper.makeListItemButton("Character: &lt;" + (!obj.name || obj.name === undefined ? "&lt;same as ID&gt;" : obj.name) +"&gt;", "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
+            listItems.push(MenuHelper.makeListItemButton("Size: " + (!obj.size || obj.size === undefined ? "&lt;auto&gt;" : obj.size), "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
+        }
+        
+        const deleteShapeButton = MenuHelper.makeButton("Delete Shape", cmdShapeRemove + shifterKey + API_CMD.SEPARATOR + shapeKey, ' width: 100%');
+        const modifyShifterButton = MenuHelper.makeButton("Modify Shifter: " + shifterKey, cmdShifterModify + shifterKey, ' width: 100%');
+        
+        let contents = MenuHelper.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + modifyShifterButton;
+        MenuHelper.makeAndSendMenu(API_NAME, contents, API_NAME + ': ' + shifterKey + " - " + shapeKey);
+    }
+
+    const sendModifyShifterMenu = (shifterKey) => {
+        const cmdShapeModify = API_CMD.CONFIG_MODIFY + API_CMD.SHAPE + API_CMD.SEPARATOR;
+        const cmdShapeAdd = API_CMD.CONFIG_ADD + API_CMD.SHAPE + API_CMD.SEPARATOR;
+        const cmdShifterRemove = API_CMD.CONFIG_REMOVE + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+
+        const shifter = state[API_STATENAME].ShapeShifters[shifterKey];
+
+        let listItems = [];
+        
+        listItems.push(MenuHelper.makeListItemButton("<b>Shapes:</b>", "Add Shape", cmdShapeAdd + shifterKey + API_CMD.SEPARATOR + "?{Shape Name}"));
+        
+        _.each(shifter.shapes, (value, key) =>
+        {
+            listItems.push(MenuHelper.makeListItemButton(key, "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + key));
+        });
+        
+        const deleteShifterButton = MenuHelper.makeButton("Delete Shifter: " + shifterKey, cmdShifterRemove + shifterKey, ' width: 100%');
+        const showShiftersButton = MenuHelper.makeButton("Show Shifters", API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.SHOW_SHIFTERS, ' width: 100%');
+        
+        let contents = MenuHelper.makeList(listItems) + '<hr>' + deleteShifterButton + '<hr>' + showShiftersButton;
+        MenuHelper.makeAndSendMenu(API_NAME, contents, API_NAME + ': ' + shifterKey);
+    }
+
+    const sendShowShiftersMenu = () => {
+        
+        const cmdShifterAdd = API_CMD.CONFIG_ADD + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        const cmdShifterModify = API_CMD.CONFIG_MODIFY + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        
+        let listItems = [];
+        _.each(state[API_STATENAME].ShapeShifters, (value, key) => {
+            listItems.push(MenuHelper.makeListItemButton(key, "Modify", cmdShifterModify + key));
+        });
+
+        
+        const addShifterButton = MenuHelper.makeButton("Add ShapeShifter", cmdShifterAdd + "?{Name}", ' width: 100%');;
+        const configButton = MenuHelper.makeButton("Config", API_CMD.CONFIG_ROOT, ' width: 100%');;
+        
+        let contents = MenuHelper.makeList(listItems) + '<hr>' + addShifterButton + '<hr>' + configButton;
+        MenuHelper.makeAndSendMenu(API_NAME, contents, API_NAME + ': ShapeShifters');
+    }
+    
     const sendConfigMenu = (first) => {
+        let apiCmdBase = API_CMD.ROOT + API_CMD.SEPARATOR;
+        
         let listItems = [
-            MenuHelper.makeListItemButton("Display Command Usage", "Help", "!ws help"),
+            MenuHelper.makeListItemButton("Display Command Usage", "Help", apiCmdBase + API_CMD.HELP),
+            
         ];
+        
+        const showShiftersButton = MenuHelper.makeButton("Display Shifters", apiCmdBase + API_CMD.SHOW_SHIFTERS, ' width: 100%');
+        const configButton = MenuHelper.makeButton('Config', API_CMD.CONFIG_ROOT, ' width: 100%');
+        const exportButton = MenuHelper.makeButton('Export Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + 'export', ' width: 100%');
+        const importButton = MenuHelper.makeButton('Import Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + 'import' + API_CMD.SEPARATOR + '?{Config}', ' width: 100%');
+        const resetButton = MenuHelper.makeButton('Reset Config', API_CMD.CONFIG_RESET, ' width: 100%');
 
-        let configButton = MenuHelper.makeButton('Config', API_CMD + ' config', ' width: 100%');
-        let resetButton = MenuHelper.makeButton('Reset Config', API_CMD + ' config reset', ' width: 100%');
-        let exportButton = MenuHelper.makeButton('Export Config', API_CMD + ' config export', ' width: 100%');
-        let importButton = MenuHelper.makeButton('Import Config', API_CMD + ' config import ?{Config}', ' width: 100%');
-
-        let title_text = (first) ? API_NAME+' First Time Setup' : API_NAME+' Config';
-        let contents = MenuHelper.makeList(listItems, ' overflow:hidden;', ' overflow: hidden')
-                      +'<hr>'+configButton+'<hr><p style="font-size: 80%">You can always open this config by typing `'+API_CMD+' config`.</p><hr>'
-                      +exportButton+importButton+resetButton;
+        let title_text = API_NAME + ((first) ? ': First Time Setup' : ': Config');
+        let contents = MenuHelper.makeList(listItems)
+                      + '<hr>' + showShiftersButton
+                      + '<hr>' + configButton
+                      + '<hr><p style="font-size: 80%">You can always open this config by typing `' + API_CMD.ROOT + ' config`.</p><hr>'
+                      + exportButton + importButton + resetButton;
         MenuHelper.makeAndSendMenu(API_NAME, contents, title_text)
     };
     
@@ -462,17 +557,15 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
     const handleInput = (msg) => {
         if (msg.type === "api")
         {
-            //const parts = msg.content.split(/ (.*)/).filter(x => x);
-            
-            if (message.content.indexOf(API_CMD) == 0)
+            if (msg.content.indexOf(API_CMD.ROOT) == 0)
             {
-                const args = msg.content.split(' ').filter(x => x);
-                args.shift(); // remove cmd
+                const args = msg.content.split(API_CMD.SEPARATOR).filter(x => x);
+                args.shift(); // remove API_CMD.ROOT
                 if(args.length == 0)
                 {
                     if (!msg.selected)
                     {
-                        sendChat(API_NAME, "Please select a token then run: " + API_CMD);
+                        sendChat(API_NAME, "Please select a token then run: " + API_CMD.ROOT);
                         return;
                     }
 
@@ -480,20 +573,26 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                     sendShapeShiftMenu(obj.tokenName, obj.target.shapes);
                     return;
                 }
-                else
+                else // is GM
                 {          
-                    const cmd = args.shift();
+                    let cmd = args.shift();
                     switch (cmd)
                     {
-                        case 'config':
+                        case API_CMD.SHOW_SHIFTERS:
+                        {
+                            sendShowShiftersMenu();
+                        }
+                        break;
+
+                        case API_CMD.CONFIG:
                         {
                             switch (args.shift())
                             {
-                                case "add":
+                                case API_CMD.ADD:
                                 {
                                     switch (args.shift())
                                     {
-                                        case "shifter":
+                                        case API_CMD.SHIFTER:
                                         {
                                             const targetName = args.shift();
                                             const targetPrefix = args.shift();
@@ -517,21 +616,29 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                                     sendChat(API_NAME, "ERROR: Trying to add ShapeShifter " + targetName + " which already exists");
                                                 }
                                             }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to add ShapeShifter without a name");
+                                            }
+                                            
+                                            sendShowShiftersMenu();
                                         }
                                         break;
 
-                                        case "shape":
+                                        case API_CMD.SHAPE:
                                         {
                                             const targetName = args.shift();
-                                            const targetShape = args.shift();
+                                            const targetShape = args.join(API_CMD.SEPARATOR);
                                             let target = state[API_STATENAME].ShapeShifters[targetName];                    
                                             if (target) 
                                             {
                                                 target.shapes[targetShape] = {};
+                                                sendModifyShifterMenu(targetName);
                                             }
                                             else
                                             {
                                                 sendChat(API_NAME, "ERROR: Trying to add shape to ShapeShifter " + targetName + " which doesn't exist");
+                                                sendShowShiftersMenu();
                                             }
                                         }
                                         break;
@@ -539,11 +646,11 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                 }                                
                                 break;
 
-                                case "remove":
+                                case API_CMD.REMOVE:
                                 {
                                     switch (args.shift())
                                     {
-                                        case "shifter":
+                                        case API_CMD.SHIFTER:
                                         {
                                             const targetName = args.shift();
                                             if (targetName)
@@ -556,14 +663,21 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                                 {
                                                     sendChat(API_NAME, "ERROR: Trying to delete ShapeShifter " + targetName + " which doesn't exists");
                                                 }
+
                                             }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to delete a ShapeShifter without providing a name");
+                                            }
+                                            
+                                            sendShowShiftersMenu();
                                         }
                                         break;
 
-                                        case "shape":
+                                        case API_CMD.SHAPE:
                                         {
                                             const targetName = args.shift();
-                                            const targetShape = args.shift();
+                                            const targetShape = args.join(API_CMD.SEPARATOR);
                                             let target = state[API_STATENAME].ShapeShifters[targetName];                    
                                             if (target) 
                                             {
@@ -575,10 +689,13 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                                 {
                                                     sendChat(API_NAME, "ERROR: Trying to remove shape " + targetShape + " that doesn't exist from ShapeShifter " + targetName);
                                                 }
+                                                
+                                                sendModifyShifterMenu(targetName);
                                             }
                                             else
                                             {
                                                 sendChat(API_NAME, "ERROR: Trying to remove shape from ShapeShifter " + targetName + " which doesn't exist");
+                                                sendShowShiftersMenu();
                                             }
                                         }
                                         break;
@@ -586,8 +703,45 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                 }
                                 break;
 
-                                case "change":
+                                case API_CMD.MODIFY:
                                 {
+                                    switch (args.shift())
+                                    {
+                                        case API_CMD.SHIFTER:
+                                        {
+                                            const targetName = args.shift();
+                                            if (targetName)
+                                            {
+                                                sendModifyShifterMenu(targetName);
+                                            }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to modify ShapeShifter without providing a name");
+                                            }
+                                        }
+                                        break;
+
+                                        case API_CMD.SHAPE:
+                                        {
+                                            const targetName = args.shift();
+                                            const targetShape = args.join(API_CMD.SEPARATOR);
+                                            if(targetName && targetShape)
+                                            {
+                                                sendModifyShapeMenu(targetName, targetShape);
+                                            }
+                                            else
+                                            {
+                                                sendChat(API_NAME, "ERROR: Trying to modify Shape without providing a name/shape");
+                                            }
+
+                                        }
+                                    }
+                                }
+                                break;
+                                
+                                case API_CMD.RESET:
+                                {
+                                    setDefaults(true);
                                 }
                                 break;
                                 
@@ -596,20 +750,20 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                         }
                         break;
 
-                        case 'help':
+                        case API_CMD.HELP:
                         {
-                            sendChat(API_NAME, API_USAGE);
+                            sendChat(API_NAME, API_CMD.USAGE);
                         }
                         break;
 
                         default:
                         {
                             // reconstruct target shape name from list of arguments
-                            const targetShapeName = cmd + " " + args.join(' ');
+                            const targetShapeName = cmd + " " + args.join(API_CMD.SEPARATOR);
 
                             if (!msg.selected)
                             {
-                                sendChat(API_NAME, "Please select a token then run: " + API_USAGE);
+                                sendChat(API_NAME, "Please select a token then run: " + API_CMD.USAGE);
                                 return;
                             }
                             
@@ -619,7 +773,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                 const obj = findShapeShifter(o);
                                 if(obj)
                                 {
-                                    if (params.toLowerCase() != "default")
+                                    if (params.toLowerCase() != API_CMD.DEFAULT_SHAPE)
                                     {
                                         const targetDruidShape = obj.target.shapes[targetShapeName];
                                         if (targetDruidShape)
@@ -649,7 +803,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
     const setDefaults = (reset) => {
         const defaults = {
             config: {
-                command: API_CMD
+                command: API_CMD.ROOT
             },
 
             ShapeShifters :
@@ -662,9 +816,11 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                   
                 shapes: {
                     GiantToad: {
-                        name: "Giant Toad",
-                        size: "Large"
-                    }
+                      name: "Giant Toad",
+                    },
+                      
+                    "Adult Black Dragon": {
+                    },
                 }
               },
         
@@ -676,7 +832,6 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                   
                   shapes: {
                       "Giant Toad": {
-                          name: "Giant Toad",
                           size: "Large"
                       },
                       
@@ -693,8 +848,8 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
             state[API_STATENAME].config = defaults.config;
         }
         else {
-            if (!state[API_STATENAME].config.hasOwnProperty('command')) {
-                state[API_STATENAME].config.command = defaults.config.command;
+            if (!state[API_STATENAME].hasOwnProperty('command')) {
+                state[API_STATENAME].command = defaults.command;
             }
         }
 
@@ -708,9 +863,9 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
             });
         }
 
-        if (!state[API_STATENAME].config.hasOwnProperty('firsttime')) {
+        if (!state[API_STATENAME].hasOwnProperty('firsttime') || reset) {
             sendConfigMenu(true);
-            state[API_STATENAME].config.firsttime = false;
+            state[API_STATENAME].firsttime = false;
         }            
     };
 
@@ -718,9 +873,9 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
         if(!_.has(state, API_STATENAME)){
             state[API_STATENAME] = state[API_STATENAME] || {};
         }
-        setDefaults(true);
+        setDefaults();
 
-        log(API_NAME + ' Ready! Usage: ' + API_USAGE);
+        log(API_NAME + ' Ready! Usage: ' + API_CMD.USAGE);
     };
     
     const registerEventHandlers = () => {
@@ -732,7 +887,6 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
 	      registerEventHandlers,
     };
 })();
-
 
 on('ready', () => { 
     'use strict';
