@@ -6,51 +6,51 @@ importing a monster from the MonsterManual:
 - re-add the image to the library
 - set the image from the library as the monster avatar
 
-
-add your data to the ShapeShifter object:
-
-ShapeShifter = {
-
-    ShifterCharacter_1: { // this needs to match the "visible name" of you character token
-        default: {
-            name: string // character name in the journal
-            shapesPrefix: string //  prefix used on all journal entries for this character shapes
-            size: optional, string in ["normal", "large", "huge", "gargantuan"], null  defaults to normal
-        },
-        
-        shapes: {
-            shapeID_1: // this matches the input to the !ws command
-            {
-                name: string // default name of the creature in the journal (ignoring the prefix),
-                size: string // optional, ["normal", "large", "huge", "gargantuan"], null defaults to NPC token_size attribute
-            },
-            
-            shapeID_2: {
-                ...
-            },
-            
-            ...
-        }
-    },
-
-    ShifterCharacter_2: { // add your other shapeshifter name here and fill in the data...
-        default: {
-            ...
-        },
-        
-        shapes: {
-            ...
-        }
-    },
-    
-    ...
-};
 */
+
+var ShapeShiftersExample =
+{
+  Helia: { // this needs to match the "visible name" of you character token
+    character: "Copy of Helia", // character name in the journal
+    shapesPrefix: "Helia-",      //  prefix used on all journal entries for this character shapes
+    size: "gargantuan",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
+
+    shapes: {
+        GiantToad: {                // this matches the input to the !ws command
+            character: "Giant Toad",  // optional, name of the character/npc in the journal (ignoring the prefix), default matches the key "GiantToad"
+            size: "auto",
+        },
+          
+        "Adult_Black_Dragon": {
+            character: "dragon",
+            size: "auto",              // optional, ["auto", "normal", "large", "huge", "gargantuan"], null defaults to NPC token_size attribute
+        },
+    }
+  },
+
+  Lavinia: {
+      character: "Copy of Lavinia",
+      shapesPrefix: "Lavinia-",
+      size: "normal",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
+
+      shapes: {
+        GiantToad: {                // this matches the input to the !ws command
+            character: "Giant Toad",  // optional, name of the character/npc in the journal (ignoring the prefix), default matches the key "GiantToad"
+            size: "huge",
+        },
+          
+        "Adult_Black_Dragon": {
+            character: "dragon",
+            size: "gargantuan",              // optional, ["auto", "normal", "large", "huge", "gargantuan"], null defaults to NPC token_size attribute
+        },
+      }
+  }
+}
 
 var MenuHelper = MenuHelper || (function () {
     var MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px;";
     var BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center;";
-    var LIST_STYLE = "list-style: none; padding: 0; margin: 0; overflow:hidden;";
+    var LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 20px; overflow:hidden;";
     var ITEM_STYLE = "overflow:hidden;";
 
     makeTitle = (title, title_tag) => {
@@ -62,9 +62,13 @@ var MenuHelper = MenuHelper || (function () {
         return '<a style="'+(style || BUTTON_STYLE) + addStyle +'" href="'+href+'" title="'+(alt || href)+'">'+title+'</a>';
     };
 
-    makeListItemButton = (itemName, buttonName, href, addButtonStyle, buttonStyle, alt) => {
-        return '<span style="float: left">'+itemName+'</span> ' + makeButton(buttonName, href,  "float: right;" + addButtonStyle, buttonStyle, alt);
-    }
+    makeListItem = (itemName, addStyle) => {
+        return '<span style="float: left; ' + addStyle + '">'+itemName+'</span> ';
+    };
+
+    makeListButton = (buttonName, href, addButtonStyle, buttonStyle, alt) => {
+        return makeButton(buttonName, href,  "float: right; " + addButtonStyle, buttonStyle, alt);
+    };
 
     makeList = (items, addListStyle, addItemStyle, listStyle, itemStyle) => {
         let list = '<ul style="'+(listStyle || LIST_STYLE)+addListStyle+'">';
@@ -89,7 +93,8 @@ var MenuHelper = MenuHelper || (function () {
       ITEM_STYLE,
       makeTitle,
       makeButton,
-      makeListItemButton,
+      makeListItem,
+      makeListButton,
       makeList,
       makeAndSendMenu,
     }
@@ -114,13 +119,19 @@ var WildShape = WildShape || (function() {
         CONFIG : "config",
         ADD : "add",
         REMOVE : "remove",
-        MODIFY : "modify",
+        EDIT : "edit",
         RESET : "reset",
         
         SHOW_SHIFTERS : "showshifters",
         
         SHIFTER : "shifter",
         SHAPE : "shape",
+        
+        ID: "ID",
+        CHARACTER: "character",
+        SHAPE_PREFIX: "shapesPrefix",
+        SHAPE_SIZE: "size",
+        FIELD_SHAPES: "shapes",
 
         DEFAULT_SHAPE : "default",
     }
@@ -128,7 +139,7 @@ var WildShape = WildShape || (function() {
     API_CMD["CONFIG_ROOT"]   = API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.CONFIG;
     API_CMD["CONFIG_ADD"]    = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.ADD + API_CMD.SEPARATOR;
     API_CMD["CONFIG_REMOVE"] = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.REMOVE + API_CMD.SEPARATOR;
-    API_CMD["CONFIG_MODIFY"] = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.MODIFY + API_CMD.SEPARATOR;
+    API_CMD["CONFIG_EDIT"] = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.EDIT + API_CMD.SEPARATOR;
     API_CMD["CONFIG_RESET"]    = API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.RESET;
     
     const sendShapeShiftMenu = (shifterKey, shapes) => {
@@ -141,10 +152,10 @@ var WildShape = WildShape || (function() {
         MenuHelper.makeAndSendMenu(API_NAME, buttons, API_NAME + ': ' + shifterKey + ' ShapeShift');
     };
 
-    const sendModifyShapeMenu = (shifterKey, shapeKey) => {
-        const cmdShapeModify = API_CMD.CONFIG_MODIFY + API_CMD.SHAPE + API_CMD.SEPARATOR;
-        const cmdShapeRemove = API_CMD.CONFIG_REMOVE + API_CMD.SHAPE + API_CMD.SEPARATOR;
-        const cmdShifterModify = API_CMD.CONFIG_MODIFY + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+    const sendEditShapeMenu = (shifterKey, shapeKey) => {
+        const cmdShapeEdit = API_CMD.CONFIG_EDIT + API_CMD.SHAPE + API_CMD.SEPARATOR;
+        const cmdRemove = API_CMD.CONFIG_REMOVE;
+        const cmdShifterEdit = API_CMD.CONFIG_EDIT + API_CMD.SHIFTER + API_CMD.SEPARATOR;
         
         const shifter = state[API_STATENAME].ShapeShifters[shifterKey];
         
@@ -153,51 +164,63 @@ var WildShape = WildShape || (function() {
         let listItems = [];
         if(obj)
         {
-            listItems.push(MenuHelper.makeListItemButton("ID: &lt;" + shapeKey + "&gt;", "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
-            listItems.push(MenuHelper.makeListItemButton("Character: &lt;" + (!obj.name || obj.name === undefined ? "&lt;same as ID&gt;" : obj.name) +"&gt;", "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
-            listItems.push(MenuHelper.makeListItemButton("Size: " + (!obj.size || obj.size === undefined ? "&lt;auto&gt;" : obj.size), "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + shapeKey));
+            listItems.push(MenuHelper.makeListItem("ID: &lt;" + shapeKey + "&gt;") + MenuHelper.makeListButton("Edit", cmdShapeEdit + shifterKey + API_CMD.SEPARATOR + shapeKey + API_CMD.SEPARATOR + API_CMD.ID + API_CMD.SEPARATOR + "?{Edit ID|" + shapeKey + "}"));
+            listItems.push(MenuHelper.makeListItem("Character: &lt;" + obj[API_CMD.CHARACTER] + "&gt;") + MenuHelper.makeListButton("Edit", cmdShapeEdit + shifterKey + API_CMD.SEPARATOR + shapeKey + API_CMD.SEPARATOR + API_CMD.CHARACTER + API_CMD.SEPARATOR + "?{Edit Character|" + obj[API_CMD.CHARACTER] + "}"));
+            listItems.push(MenuHelper.makeListItem("Size: " + obj[API_CMD.SHAPE_SIZE]) + MenuHelper.makeListButton("Edit", cmdShapeEdit + shifterKey + API_CMD.SEPARATOR + shapeKey + API_CMD.SEPARATOR + API_CMD.SHAPE_SIZE + API_CMD.SEPARATOR + "?{Edit Size|auto|normal|large|huge|gargantuan}"));
         }
         
-        const deleteShapeButton = MenuHelper.makeButton("Delete Shape", cmdShapeRemove + shifterKey + API_CMD.SEPARATOR + shapeKey, ' width: 100%');
-        const modifyShifterButton = MenuHelper.makeButton("Modify Shifter: " + shifterKey, cmdShifterModify + shifterKey, ' width: 100%');
+        const deleteShapeButton = MenuHelper.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + API_CMD.SEPARATOR + API_CMD.SHAPE + API_CMD.SEPARATOR + shifterKey + API_CMD.SEPARATOR + shapeKey, ' width: 100%');
+        const editShifterButton = MenuHelper.makeButton("Edit Shifter: " + shifterKey, cmdShifterEdit + shifterKey, ' width: 100%');
         
-        let contents = MenuHelper.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + modifyShifterButton;
+        let contents = MenuHelper.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
         MenuHelper.makeAndSendMenu(API_NAME, contents, API_NAME + ': ' + shifterKey + " - " + shapeKey);
     }
 
-    const sendModifyShifterMenu = (shifterKey) => {
-        const cmdShapeModify = API_CMD.CONFIG_MODIFY + API_CMD.SHAPE + API_CMD.SEPARATOR;
+    const sendEditShifterMenu = (shifterKey) => {
+        const cmdShapeEdit = API_CMD.CONFIG_EDIT + API_CMD.SHAPE + API_CMD.SEPARATOR;
         const cmdShapeAdd = API_CMD.CONFIG_ADD + API_CMD.SHAPE + API_CMD.SEPARATOR;
-        const cmdShifterRemove = API_CMD.CONFIG_REMOVE + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        const cmdShifterEdit = API_CMD.CONFIG_EDIT + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        const cmdRemove = API_CMD.CONFIG_REMOVE;
 
-        const shifter = state[API_STATENAME].ShapeShifters[shifterKey];
+        const obj = state[API_STATENAME].ShapeShifters[shifterKey];
 
         let listItems = [];
-        
-        listItems.push(MenuHelper.makeListItemButton("<b>Shapes:</b>", "Add Shape", cmdShapeAdd + shifterKey + API_CMD.SEPARATOR + "?{Shape Name}"));
-        
-        _.each(shifter.shapes, (value, key) =>
+        listItems.push(MenuHelper.makeListItem("<p style='font-size: 120%'><b>Settings:</b></p>"));
+        let listSettings = [];
         {
-            listItems.push(MenuHelper.makeListItemButton(key, "Modify", cmdShapeModify + shifterKey + API_CMD.SEPARATOR + key));
-        });
+            listSettings.push(MenuHelper.makeListItem("ID: &lt;" + shifterKey + "&gt;") + MenuHelper.makeListButton("Edit", cmdShifterEdit + shifterKey + API_CMD.SEPARATOR + API_CMD.ID + API_CMD.SEPARATOR + "?{Edit ID|" + shifterKey + "}"));
+            listSettings.push(MenuHelper.makeListItem("Character: &lt;" + obj[API_CMD.CHARACTER]+"&gt;") + MenuHelper.makeListButton("Edit", cmdShifterEdit + shifterKey + API_CMD.SEPARATOR + API_CMD.CHARACTER + API_CMD.SEPARATOR + "?{Edit Character|" + obj[API_CMD.CHARACTER] + "}"));
+            listSettings.push(MenuHelper.makeListItem("Size: &lt;" + obj[API_CMD.SHAPE_SIZE] + "&gt;") + MenuHelper.makeListButton("Edit", cmdShifterEdit + shifterKey + API_CMD.SEPARATOR + API_CMD.SHAPE_SIZE + API_CMD.SEPARATOR + "?{Edit Size|auto|normal|large|huge|gargantuan}"));
+            listSettings.push(MenuHelper.makeListItem("Shapes Prefix: &lt;" + obj[API_CMD.SHAPE_PREFIX] + "&gt;") + MenuHelper.makeListButton("Edit", cmdShifterEdit + shifterKey + API_CMD.SEPARATOR + API_CMD.SHAPE_PREFIX + API_CMD.SEPARATOR + "?{Edit Shapes Prefix" + (!obj[API_CMD.SHAPE_PREFIX] ? "" : ("|" + obj[API_CMD.SHAPE_PREFIX])) + "}"));
+        }
+        listItems.push(MenuHelper.makeList(listSettings, " padding-left: 10px"));
         
-        const deleteShifterButton = MenuHelper.makeButton("Delete Shifter: " + shifterKey, cmdShifterRemove + shifterKey, ' width: 100%');
-        const showShiftersButton = MenuHelper.makeButton("Show Shifters", API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.SHOW_SHIFTERS, ' width: 100%');
+        listItems.push(MenuHelper.makeListItem("<p style='font-size: 120%'><b>Shapes:</b></p>") + MenuHelper.makeListButton("Add Shape", cmdShapeAdd + shifterKey + API_CMD.SEPARATOR + "?{Shape Name}"));
+        let listShapes = [];
+        {
+          _.each(sortByKey(obj.shapes), (value, key) =>
+          {
+              listShapes.push(MenuHelper.makeListItem(key) + MenuHelper.makeListButton("Edit", cmdShapeEdit + shifterKey + API_CMD.SEPARATOR + key));
+          });
+        }
+        listItems.push(MenuHelper.makeList(listShapes, " padding-left: 10px"));
+
+        const deleteShifterButton = MenuHelper.makeButton("Delete: " + shifterKey, cmdRemove + "?{Are you sure?|no|yes}" + API_CMD.SEPARATOR + API_CMD.SHIFTER + API_CMD.SEPARATOR + shifterKey, ' width: 100%');
+        const showShiftersButton = MenuHelper.makeButton("Show ShapeShifters", API_CMD.ROOT + API_CMD.SEPARATOR + API_CMD.SHOW_SHIFTERS, ' width: 100%');
         
-        let contents = MenuHelper.makeList(listItems) + '<hr>' + deleteShifterButton + '<hr>' + showShiftersButton;
+        let contents = MenuHelper.makeList(listItems) + deleteShifterButton + '<hr>' + showShiftersButton;
         MenuHelper.makeAndSendMenu(API_NAME, contents, API_NAME + ': ' + shifterKey);
     }
 
     const sendShowShiftersMenu = () => {
         
         const cmdShifterAdd = API_CMD.CONFIG_ADD + API_CMD.SHIFTER + API_CMD.SEPARATOR;
-        const cmdShifterModify = API_CMD.CONFIG_MODIFY + API_CMD.SHIFTER + API_CMD.SEPARATOR;
+        const cmdShifterEdit = API_CMD.CONFIG_EDIT + API_CMD.SHIFTER + API_CMD.SEPARATOR;
         
         let listItems = [];
-        _.each(state[API_STATENAME].ShapeShifters, (value, key) => {
-            listItems.push(MenuHelper.makeListItemButton(key, "Modify", cmdShifterModify + key));
+        _.each(sortByKey(state[API_STATENAME].ShapeShifters), (value, key) => {
+            listItems.push(MenuHelper.makeListItem(key) + MenuHelper.makeListButton("Edit", cmdShifterEdit + key));
         });
-
         
         const addShifterButton = MenuHelper.makeButton("Add ShapeShifter", cmdShifterAdd + "?{Name}", ' width: 100%');;
         const configButton = MenuHelper.makeButton("Config", API_CMD.CONFIG_ROOT, ' width: 100%');;
@@ -210,14 +233,14 @@ var WildShape = WildShape || (function() {
         let apiCmdBase = API_CMD.ROOT + API_CMD.SEPARATOR;
         
         let listItems = [
-            MenuHelper.makeListItemButton("Display Command Usage", "Help", apiCmdBase + API_CMD.HELP),
+            MenuHelper.makeListItem("Display Command Usage") + MenuHelper.makeListButton("Help", apiCmdBase + API_CMD.HELP),
             
         ];
         
-        const showShiftersButton = MenuHelper.makeButton("Display Shifters", apiCmdBase + API_CMD.SHOW_SHIFTERS, ' width: 100%');
+        const showShiftersButton = MenuHelper.makeButton("Display ShapeShifters", apiCmdBase + API_CMD.SHOW_SHIFTERS, ' width: 100%');
         const configButton = MenuHelper.makeButton('Config', API_CMD.CONFIG_ROOT, ' width: 100%');
-        const exportButton = MenuHelper.makeButton('Export Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + 'export', ' width: 100%');
-        const importButton = MenuHelper.makeButton('Import Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + 'import' + API_CMD.SEPARATOR + '?{Config}', ' width: 100%');
+        const exportButton = MenuHelper.makeButton('Export Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.EXPORT, ' width: 100%');
+        const importButton = MenuHelper.makeButton('Import Config', API_CMD.CONFIG_ROOT + API_CMD.SEPARATOR + API_CMD.IMPORT + API_CMD.SEPARATOR + '?{Config}', ' width: 100%');
         const resetButton = MenuHelper.makeButton('Reset Config', API_CMD.CONFIG_RESET, ' width: 100%');
 
         let title_text = API_NAME + ((first) ? ': First Time Setup' : ': Config');
@@ -227,6 +250,15 @@ var WildShape = WildShape || (function() {
                       + '<hr><p style="font-size: 80%">You can always open this config by typing `' + API_CMD.ROOT + ' config`.</p><hr>'
                       + exportButton + importButton + resetButton;
         MenuHelper.makeAndSendMenu(API_NAME, contents, title_text)
+    };
+    
+    let sortByKey = (unordered) => {
+        let ordered = {};
+        _.each(Object.keys(unordered).sort(), (key) => {
+            ordered[key] = unordered[key];
+        });
+        
+        return ordered;
     };
     
     function getCleanImgsrc(imgsrc) {
@@ -431,18 +463,18 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
             toAttr.set("current", fromAttr);
     };
 
-    function shapeShift(selectedToken, defaultShapeObj, targetShapeObj)
+    function shapeShift(selectedToken, settings, targetShapeObj)
     {
-        const defaultCharacter = findObjs({ type: 'character', name: defaultShapeObj.name })[0];
+        const defaultCharacter = findObjs({ type: 'character', name: settings[API_CMD.CHARACTER] })[0];
         if (!defaultCharacter)
         {
-            sendChat(API_NAME, "ERROR: cannot find default character = " + defaultShapeObj.name);
+            sendChat(API_NAME, "ERROR: cannot find default character = " + settings[API_CMD.CHARACTER]);
             return;
         }
         
         if(targetShapeObj)
         {
-            const targetName = defaultShapeObj.shapesPrefix + targetShapeObj.name;
+            const targetName = settings[API_CMD.SHAPE_PREFIX] + targetShapeObj[API_CMD.CHARACTER];
             const targetCharacter = findObjs({ type: 'character', name: targetName })[0];
             if (!targetCharacter)
             {
@@ -463,7 +495,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                 const targetSize = getAttrByName(targetCharacterId, "token_size");
                 if (targetSize === undefined)
                 {
-                    targetSize =  getCreatureSize(targetShapeObj.size);
+                    targetSize =  getCreatureSize(targetShapeObj[API_CMD.SHAPE_SIZE]);
                 }
                 
                 if (API_DEBUG)
@@ -483,7 +515,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                 
                 _.each(copyAttrNames, function (attrName) {
                     _.each(copyAttrVariations, function (attrVar) {
-                        copyAttribute(defaultShapeObj.id, targetCharacterId, attrName + attrVar, false);
+                        copyAttribute(settings[API_CMD.ID], targetCharacterId, attrName + attrVar, false);
                     });
                 });
                 
@@ -522,8 +554,8 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
         else
         {
             const targetCharacter = defaultCharacter;
-            const targetCharacterId = defaultShapeObj.id;
-            const targetSize = getCreatureSize(defaultShapeObj.size);
+            const targetCharacterId = settings[API_CMD.ID];
+            const targetSize = getCreatureSize(settings[API_CMD.SHAPE_SIZE]);
 
 	        targetCharacter.get('_defaulttoken', function(defaulttoken){
 	            let tokenImg;
@@ -594,22 +626,19 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                     {
                                         case API_CMD.SHIFTER:
                                         {
-                                            const targetName = args.shift();
-                                            const targetPrefix = args.shift();
-                                            if (targetName)
+                                            const targetID = args.join("_");
+                                            if (targetID)
                                             {
-                                                let target = state[API_STATENAME].ShapeShifters[targetName];
+                                                let targetName = targetID.replace(/_/g, API_CMD.SEPARATOR); 
+                                                let target = state[API_STATENAME].ShapeShifters[targetID];
                                                 if(!target)
                                                 {
-                                                    target = {
-                                                        default: {
-                                                          name: targetName,
-                                                          shapesPrefix: targetPrefix || '',
-                                                        },
-                                                          
-                                                        shapes: {}
-                                                    }
-                                                    state[API_STATENAME].ShapeShifters[targetName] = target;
+                                                    target = {};
+                                                    target[API_CMD.CHARACTER] = targetName;
+                                                    target[API_CMD.SHAPE_SIZE] = "normal";
+                                                    target[API_CMD.SHAPE_PREFIX] = "";
+                                                    target[API_CMD.FIELD_SHAPES] = {};
+                                                    state[API_STATENAME].ShapeShifters[targetID] = target;
                                                 }
                                                 else
                                                 {
@@ -628,12 +657,18 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                         case API_CMD.SHAPE:
                                         {
                                             const targetName = args.shift();
-                                            const targetShape = args.join(API_CMD.SEPARATOR);
+                                            const targetShapeID = args.join("_");                                            
                                             let target = state[API_STATENAME].ShapeShifters[targetName];                    
                                             if (target) 
                                             {
-                                                target.shapes[targetShape] = {};
-                                                sendModifyShifterMenu(targetName);
+                                                let targetShapeName = targetShapeID.replace(/_/g, API_CMD.SEPARATOR);
+                                                
+                                                let shape = {}
+                                                shape[API_CMD.CHARACTER] = targetShapeName;
+                                                shape[API_CMD.SHAPE_SIZE] = "auto";
+
+                                                target.shapes[targetShapeID] = shape;
+                                                sendEditShifterMenu(targetName);
                                             }
                                             else
                                             {
@@ -648,6 +683,9 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
 
                                 case API_CMD.REMOVE:
                                 {
+                                    if (args.shift() == 'no')
+                                        return;
+                                        
                                     switch (args.shift())
                                     {
                                         case API_CMD.SHIFTER:
@@ -677,7 +715,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                         case API_CMD.SHAPE:
                                         {
                                             const targetName = args.shift();
-                                            const targetShape = args.join(API_CMD.SEPARATOR);
+                                            const targetShape = args.shift();
                                             let target = state[API_STATENAME].ShapeShifters[targetName];                    
                                             if (target) 
                                             {
@@ -690,7 +728,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                                     sendChat(API_NAME, "ERROR: Trying to remove shape " + targetShape + " that doesn't exist from ShapeShifter " + targetName);
                                                 }
                                                 
-                                                sendModifyShifterMenu(targetName);
+                                                sendEditShifterMenu(targetName);
                                             }
                                             else
                                             {
@@ -703,20 +741,34 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                 }
                                 break;
 
-                                case API_CMD.MODIFY:
+                                case API_CMD.EDIT:
                                 {
                                     switch (args.shift())
                                     {
                                         case API_CMD.SHIFTER:
                                         {
-                                            const targetName = args.shift();
-                                            if (targetName)
+                                            let targetName = args.shift();
+                                            let target = state[API_STATENAME].ShapeShifters[targetName];
+                                            if (target)
                                             {
-                                                sendModifyShifterMenu(targetName);
+                                                const field = args.shift();
+                                                if(field == API_CMD.ID)
+                                                {
+                                                    let oldTargetName = targetName; 
+                                                    targetName = args.join("_");
+                                                    state[API_STATENAME].ShapeShifters[targetName] = target;
+                                                    delete state[API_STATENAME].ShapeShifters[oldTargetName];
+                                                }
+                                                else
+                                                {
+                                                    target[field] = args.join(API_CMD.SEPARATOR);
+                                                }
+
+                                                sendEditShifterMenu(targetName);
                                             }
                                             else
                                             {
-                                                sendChat(API_NAME, "ERROR: Trying to modify ShapeShifter without providing a name");
+                                                sendChat(API_NAME, "cannot find target = " + targetName);
                                             }
                                         }
                                         break;
@@ -724,16 +776,33 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                         case API_CMD.SHAPE:
                                         {
                                             const targetName = args.shift();
-                                            const targetShape = args.join(API_CMD.SEPARATOR);
-                                            if(targetName && targetShape)
+                                            let target = state[API_STATENAME].ShapeShifters[targetName];
+                                            if (target)
                                             {
-                                                sendModifyShapeMenu(targetName, targetShape);
-                                            }
-                                            else
-                                            {
-                                                sendChat(API_NAME, "ERROR: Trying to modify Shape without providing a name/shape");
-                                            }
+                                                let shapeName = args.shift();
+                                                let targetShape = target[API_CMD.FIELD_SHAPES][shapeName];
+                                                if (targetShape)
+                                                {
+                                                    const field = args.shift();
+                                                    if(field == API_CMD.ID)
+                                                    {
+                                                        let oldShapeName = shapeName; 
+                                                        shapeName = args.join("_");
+                                                        target[API_CMD.FIELD_SHAPES][shapeName] = targetShape;
+                                                        delete target[API_CMD.FIELD_SHAPES][oldShapeName];
+                                                    }
+                                                    else
+                                                    {
+                                                        targetShape[field] = args.join(API_CMD.SEPARATOR);
+                                                    }
 
+                                                    sendEditShapeMenu(targetName, shapeName);
+                                                }
+                                                else
+                                                {
+                                                    sendEditShifterMenu(targetName);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -775,11 +844,11 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                 {
                                     if (params.toLowerCase() != API_CMD.DEFAULT_SHAPE)
                                     {
-                                        const targetDruidShape = obj.target.shapes[targetShapeName];
+                                        const targetDruidShape = obj.target[API_CMD.FIELD_SHAPES][targetShapeName];
                                         if (targetDruidShape)
                                         {
-                                            sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape.name);
-                                            shapeShift(obj.token, obj.target.default, targetDruidShape);
+                                            sendChat(API_NAME, obj.tokenName + " is transforming into: " + targetDruidShape[API_CMD.CHARACTER]);
+                                            shapeShift(obj.token, obj.target, targetDruidShape);
                                         }
                                         else
                                         {
@@ -789,7 +858,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
                                     else
                                     {
                                         sendChat(API_NAME,  obj.tokenName + " is transforming back into the default shape");
-                                        shapeShift(obj.token, obj.target.default);
+                                        shapeShift(obj.token, obj.target);
                                     }
                                 }
                             });
@@ -803,46 +872,13 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
     const setDefaults = (reset) => {
         const defaults = {
             config: {
-                command: API_CMD.ROOT
+                version: API_VERSION,
             },
 
-            ShapeShifters :
-            {
-              Yunith: {
-                default: {
-                  name: "Druid Test",
-                  shapesPrefix: "Druid-",
-                },
-                  
-                shapes: {
-                    GiantToad: {
-                      name: "Giant Toad",
-                    },
-                      
-                    "Adult Black Dragon": {
-                    },
-                }
-              },
-        
-              Kamlo: {
-                  default: {
-                      name: "Copy of Kamlo Cortes",
-                      shapesPrefix: "Kamlo-",
-                  },
-                  
-                  shapes: {
-                      "Giant Toad": {
-                          size: "Large"
-                      },
-                      
-                      "Adult Black Dragon": {
-                          name: "Adult Black Dragon",
-                          size: "Huge"
-                      }
-                  }
-              }
-            }
+            ShapeShifters: {}
         }
+
+        defaults.ShapeShifters = ShapeShiftersExample;
 
         if (!state[API_STATENAME].config || reset) {
             state[API_STATENAME].config = defaults.config;
@@ -859,7 +895,18 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
             
             // initialize default IDs
             _.each(state[API_STATENAME].ShapeShifters, function(s) {
-                s.default.id = findObjs({ type: 'character', name: s.default.name })[0].get('id');
+                if (s[API_CMD.ID] === undefined || reset)
+                {
+                    let obj = findObjs({ type: 'character', name: s[API_CMD.CHARACTER] });
+                    if(obj && obj.length == 1)
+                    {
+                        s[API_CMD.ID] = obj[0].get('id');
+                    }
+                    else
+                    {
+                        sendChat(API_NAME, "trying to initialize invalid character: " + s[API_CMD.CHARACTER]);
+                    }
+                }
             });
         }
 
@@ -887,6 +934,7 @@ var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
 	      registerEventHandlers,
     };
 })();
+
 
 on('ready', () => { 
     'use strict';
