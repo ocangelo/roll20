@@ -11,7 +11,7 @@ importing a monster from the MonsterManual:
 var ShapeShiftersExample =
 {
   Helia: { // this needs to match the "visible name" of you character token
-    character: "Copy of Helia", // character name in the journal
+    character: "1 Copy of Helia", // character name in the journal
     shapesPrefix: "Helia-",      //  prefix used on all journal entries for this character shapes
     size: "gargantuan",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
 
