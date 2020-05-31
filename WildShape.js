@@ -8,13 +8,18 @@ importing a monster from the MonsterManual:
 
 */
 
-var ShapeShiftersExample =
+/*jshint -W069 */
+/*jshint -W014 */
+
+/*
+const ShapeShiftersExample =
 {
     Helia: { // this needs to match the "visible name" of you character token
         settings : {
             character: "Copy of Helia", // character name in the journal
             shapesPrefix: "Helia-",      //  prefix used on all journal entries for this character shapes
             size: "gargantuan",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
+            isdruid: true,
         },
 
         shapes: {
@@ -35,6 +40,7 @@ var ShapeShiftersExample =
             character: "Copy of Lavinia",
             shapesPrefix: "Lavinia-",
             size: "normal",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
+            isdruid: true,
         },
 
         shapes: {
@@ -49,7 +55,8 @@ var ShapeShiftersExample =
             },
         }
     }
-}
+};
+*/
 
 const API = {
     NAME : "WildShape",
@@ -87,6 +94,8 @@ const API = {
         EDIT : "edit",
         RESET : "reset",
 
+        SHIFT : "shift",
+
         SHOW_SHIFTERS : "showshifters",        
     },
 
@@ -102,215 +111,74 @@ const API = {
         SHAPES: "shapes",
 
         ID: "ID",
+        NAME: "name",
         CHARACTER: "character",
         SHAPE_PREFIX: "shapesPrefix",
         SIZE: "size",
+        ISDRUID: "isdruid",
     }
-}
+};
 
-class MenuHelper {
-    constructor() 
-    {
-        this.MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px;";
-        this.BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center;";
-        this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 20px; overflow:hidden;";
-        this.ITEM_STYLE = "overflow:hidden;";
-    }
-
-    makeTitle(title, title_tag) {
-        title_tag = (title_tag && title_tag !== '') ? title_tag : 'h3';
-        return '<' + title_tag + ' style="margin-bottom: 10px;">' + title + '</' + title_tag+'>';
-    }
-
-    makeButton(title, href, addStyle, style, alt) {
-        return '<a style="'+ (style || this.BUTTON_STYLE) + addStyle + '" href="' + href + '" title="' + (alt || href) + '">' + title + '</a>';
-    }
-
-    makeListLabel(itemName, addStyle) {
-        return '<span style="float: left; ' + addStyle + '">' + itemName + '</span> ';
-    }
-
-    makeListButton(buttonName, href, addButtonStyle, buttonStyle, alt) {
-        return this.makeButton(buttonName, href,  "float: right; " + addButtonStyle, buttonStyle, alt);
-    }
-
-    makeList(items, addListStyle, addItemStyle, listStyle, itemStyle) {
-        let list = '<ul style="' + (listStyle || this.LIST_STYLE) + addListStyle + '">';
-        items.forEach((item) => {
-            list += '<li style="' + (itemStyle || this.ITEM_STYLE) + addItemStyle + '">' + item + '</li>';
-        });
-        list += '</ul>';
-        return list;
-    }
-
-    showMenu(who, contents, title, settings) {
-        settings = settings || {};
-        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
-        title = (title && title != '') ? this.makeTitle(title, settings.title_tag || '') : '';
-        sendChat(who, settings.whisper + '<div style="' + this.MENU_STYLE + '">' + title + contents + '</div>', null, {noarchive:true});
-    }
-}
-
-class WildShapeMenu extends MenuHelper
-{
+class Utils {
     constructor() {
-        super();
-        this.CMD = {};
-        this.CMD["ROOT"]            = API.CMD.ROOT + API.CMD.SEP;
-        this.CMD["CONFIG_ROOT"]     = this.CMD.ROOT + API.CMD.CONFIG;
-        this.CMD["CONFIG_ADD"]      = this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.ADD + API.CMD.SEP;
-        this.CMD["CONFIG_REMOVE"]   = this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.REMOVE + API.CMD.SEP;
-        this.CMD["CONFIG_EDIT"]     = this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.EDIT + API.CMD.SEP;
-        this.CMD["CONFIG_RESET"]    = this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.RESET;
 
-        this["SHAPE_SIZES"] = API.SHAPE_SIZES.join("|");
     }
 
-    showShapeShift(shifterKey, shapes) {
-        let buttons = this.makeButton(shifterKey, this.CMD.ROOT + API.DEFAULT_SHAPE, ' width: 100%');;
-
-        _.each(shapes, function(value, key) {
-            buttons += this.makeButton(key, this.CMD.ROOT + key, ' width: 100%');
-        });
-
-        this.showMenu(API.NAME, buttons, API.NAME + ': ' + shifterKey + ' ShapeShift');
-    };
-
-    showEditShape(shifterKey, shapeKey) {
-        const cmdShapeEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
-        const cmdRemove = this.CMD.CONFIG_REMOVE;
-        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
-
-        const shifter = state[API.STATENAME][API.DATA_SHIFTERS][shifterKey];
-
-        let obj = shifter[API.FIELDS.SHAPES][shapeKey];
-        let listItems = [];
-        if(obj)
-        {
-            listItems.push(this.makeListLabel("ID: &lt;" + shapeKey + "&gt;") + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.ID + API.CMD.SEP + "?{Edit ID|" + shapeKey + "}"));
-            listItems.push(this.makeListLabel("Character: &lt;" + obj[API.FIELDS.CHARACTER] + "&gt;") + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.CHARACTER + API.CMD.SEP + "?{Edit Character|" + obj[API.FIELDS.CHARACTER] + "}"));
-            listItems.push(this.makeListLabel("Size: " + obj[API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.SIZE + API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
-        }
-
-        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + API.CMD.SEP + API.FIELDS.TARGET.SHAPE + API.CMD.SEP + shifterKey + API.CMD.SEP + shapeKey, ' width: 100%');
-        const editShifterButton = this.makeButton("Edit Shifter: " + shifterKey, cmdShifterEdit + shifterKey, ' width: 100%');
-
-        let contents = this.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
-        this.showMenu(API.NAME, contents, API.NAME + ': ' + shifterKey + " - " + shapeKey);
+    chat(msg) {
+        sendChat(API.NAME, "/w gm" + msg);
     }
 
-    showEditShifter(shifterKey) {
-        const cmdShapeEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
-        const cmdShapeAdd = this.CMD.CONFIG_ADD + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
-        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
-        const cmdRemove = this.CMD.CONFIG_REMOVE;
-
-        const obj = state[API.STATENAME][API.DATA_SHIFTERS][shifterKey];
-        const objSettings = obj[API.FIELDS.SETTINGS];
-        const objShapes = obj[API.FIELDS.SHAPES];
-
-        let listItems = [];
-        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Settings:</b></p>"));
-        let listSettings = [];
-        {
-            listSettings.push(this.makeListLabel("ID: &lt;" + shifterKey + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.ID + API.CMD.SEP + "?{Edit ID|" + shifterKey + "}"));
-            listSettings.push(this.makeListLabel("Character: &lt;" + objSettings[API.FIELDS.CHARACTER]+"&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.CHARACTER + API.CMD.SEP + "?{Edit Character|" + objSettings[API.FIELDS.CHARACTER] + "}"));
-            listSettings.push(this.makeListLabel("Size: &lt;" + objSettings[API.FIELDS.SIZE] + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.SIZE + API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
-            listSettings.push(this.makeListLabel("Shapes Prefix: &lt;" + objSettings[API.FIELDS.SHAPE_PREFIX] + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.SHAPE_PREFIX + API.CMD.SEP + "?{Edit Shapes Prefix" + (!objSettings[API.FIELDS.SHAPE_PREFIX] ? "" : ("|" + objSettings[API.FIELDS.SHAPE_PREFIX])) + "}"));
-        }
-        listItems.push(this.makeList(listSettings, " padding-left: 10px"));
-
-        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add Shape", cmdShapeAdd + shifterKey + API.CMD.SEP + "?{Shape Name}"));
-        let listShapes = [];
-        {
-            _.each(objShapes, (value, key) =>
-            {
-                listShapes.push(this.makeListLabel(key) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + key));
-            });
-        }
-        listItems.push(this.makeList(listShapes, " padding-left: 10px"));
-
-        const deleteShifterButton = this.makeButton("Delete: " + shifterKey, cmdRemove + "?{Are you sure?|no|yes}" + API.CMD.SEP + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP + shifterKey, ' width: 100%');
-        const showShiftersButton = this.makeButton("Show ShapeShifters", this.CMD.ROOT + API.CMD.SHOW_SHIFTERS, ' width: 100%');
-
-        let contents = this.makeList(listItems) + deleteShifterButton + '<hr>' + showShiftersButton;
-        this.showMenu(API.NAME, contents, API.NAME + ': ' + shifterKey);
+    chatToPlayer(playerid, msg) {
+        sendChat(API.NAME, "/w " + playerid + " " + msg);
     }
 
-    showShifters() {
-        const cmdShifterAdd = this.CMD.CONFIG_ADD + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
-        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
-
-        let listItems = [];
-        _.each(state[API.STATENAME][API.DATA_SHIFTERS], (value, key) => {
-            listItems.push(this.makeListLabel(key) + this.makeListButton("Edit", cmdShifterEdit + key));
-        });
-
-        const addShifterButton = this.makeButton("Add ShapeShifter", cmdShifterAdd + "?{Name}", ' width: 100%');;
-        const configButton = this.makeButton("Config", this.CMD.CONFIG_ROOT, ' width: 100%');;
-
-        let contents = this.makeList(listItems) + '<hr>' + addShifterButton + '<hr>' + configButton;
-        this.showMenu(API.NAME, contents, API.NAME + ': ShapeShifters');
+    chatError(msg) {
+        sendChat(API.NAME, "/w gm ERROR: " + msg);
     }
 
-    sendConfigMenu(first) {
-        let apiCmdBase = this.CMD.ROOT;
-
-        let listItems = [
-        this.makeListLabel("Display Command Usage") + this.makeListButton("Help", apiCmdBase + API.CMD.HELP),
-
-        ];
-
-        const showShiftersButton = this.makeButton("Display ShapeShifters", apiCmdBase + API.CMD.SHOW_SHIFTERS, ' width: 100%');
-        const configButton = this.makeButton('Config', this.CMD.CONFIG_ROOT, ' width: 100%');
-        const exportButton = this.makeButton('Export Config', this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.EXPORT, ' width: 100%');
-        const importButton = this.makeButton('Import Config', this.CMD.CONFIG_ROOT + API.CMD.SEP + API.CMD.IMPORT + API.CMD.SEP + '?{Config}', ' width: 100%');
-        const resetButton = this.makeButton('Reset Config', this.CMD.CONFIG_RESET, ' width: 100%');
-
-        let title_text = API.NAME + ((first) ? ': First Time Setup' : ': Config');
-        let contents = this.makeList(listItems)
-                        + '<hr>' + showShiftersButton
-                        + '<hr>' + configButton
-                        + '<hr><p style="font-size: 80%">You can always open this config by typing `' + API.CMD.ROOT + ' config`.</p><hr>'
-                        + exportButton + importButton + resetButton;
-
-        this.showMenu(API.NAME, contents, title_text)
-    };
-}
-
-var WildShape = WildShape || (function() {
-    'use strict';
-    const MENU = new WildShapeMenu();
-
-    const sortByKey = (unordered) => {
-        let ordered = {};
-        _.each(Object.keys(unordered).sort(function(a, b){return a.toLowerCase().localeCompare(b.toLowerCase())}), (key) => {
-            ordered[key] = unordered[key];
-        });
-
-        return ordered;
-    };
-
-    const sortShifters = () => {
-        // order shifters
-        state[API.STATENAME][API.DATA_SHIFTERS] = sortByKey(state[API.STATENAME][API.DATA_SHIFTERS]);
+    chatErrorToPlayer(playerid, msg) {
+        sendChat(API.NAME, "/w " + playerid + " ERROR: " + msg);
     }
 
-    const sortShapes = (shifter) => {
-        // order shapes
-        shifter[API.FIELDS.SHAPES] = sortByKey(shifter[API.FIELDS.SHAPES]);
-    }
-
-    const getCleanImgsrc = (imgsrc) => {
+    getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
         if(parts) {
             return parts[1]+'thumb'+parts[3]+(parts[4]?parts[4]:`?${Math.round(Math.random()*9999999)}`);
         }
         return;
-    };
+    }
 
+    copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
+        if(!toPrefix)
+            toPrefix = "";
+        if(!toSuffix)
+            toSuffix = "";
 
-    const duplicateCharacter = (o) => {
+        const toAttrName = toPrefix + fromAttrName + toSuffix;
+
+        //UTILS.chat("setting attribute: " + toAttrName + ", from: " + fromAttrName);
+        var fromAttr = getAttrByName(fromId, fromAttrName);
+        var toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
+        if (!toAttr) {
+            if(createAttr)
+            {
+                createObj('attribute', {
+                    characterid: toId,
+                    name: toName,
+                    current: fromAttr,
+                    max: fromAttr
+                });
+            }
+            else
+            {
+                UTILS.chatError("Cannot find attribute " + toAttrName + " on character " + toId);
+            }
+        }
+        else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
+            toAttr.set("current", fromAttr);
+    }
+
+    duplicateCharacter(o) {
         const simpleObj = (o)=>JSON.parse(JSON.stringify(o));
 
         let c = simpleObj(o.character);
@@ -340,7 +208,7 @@ var WildShape = WildShape || (function() {
             sa.characterid = newC.id;
             createObj('ability',sa);
         });
-    };
+    }
 
     /*
     _.chain(msg.selected)
@@ -357,7 +225,7 @@ var WildShape = WildShape || (function() {
     })
     .each(duplicateCharacter);
     */
-    const getCharactersWithAttrByName = (attributeName) => {
+    getCharactersWithAttrByName(attributeName) {
         /* start the chain with all the attribute objects named 'player-name' */
         return _
         .chain(filterObjs((o)=>{
@@ -398,14 +266,14 @@ var WildShape = WildShape || (function() {
         /* IN: Array of Character Objects */
         /* Unwrap Chain and return the array */
         .value();
-    };
+    }
 
     /*var charsWithPN = getCharactersWithAttrByName('player-name');
     _.each(charsWithPN,(o)=>{
         log(`Character ${o.char.get('name')} has player-name of ${o['player-name'].get('current')}/${o['player-name'].get('max')}`);
     });*/
 
-    const getFolderObjects = (objs) => {
+    getFolderObjects(objs) {
         return _.map(objs, function(o) {
             if (_.isString(o)) {
                 return getObj('handout', o) || getObj('character', o);
@@ -417,7 +285,7 @@ var WildShape = WildShape || (function() {
         });
     }
 
-    const getObjectFromFolder = (path, folderData, getFolder) => {
+    getObjectFromFolder(path, folderData, getFolder) {
         if (path.indexOf('.') < 0) {
             if (getFolder) {
                 return _.find(folderData, (o) => o.n && o.n.toLowerCase() === path.toLowerCase()).i;
@@ -438,117 +306,302 @@ var WildShape = WildShape || (function() {
     var level2PlainsMonsters = getObjectFromFolder('encounters.plains.level2', folderData, true);
     var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
     */
+}
 
-    const findShapeShifter = (selectedToken) => {
-        let tokenObj = getObj(selectedToken._type, selectedToken._id);
-        const name = tokenObj.get("name");
-        const obj = state[API.STATENAME][API.DATA_SHIFTERS][name];
-        if (obj)
+class MenuHelper {
+    constructor() 
+    {
+        this.MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px; ";
+        this.BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; ";
+        this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 20px; overflow:hidden; ";
+        this.ITEM_STYLE = "overflow:hidden;";
+    }
+
+    makeTitle(title, title_tag) {
+        title_tag = (title_tag && title_tag !== '') ? title_tag : 'h3';
+        return '<' + title_tag + ' style="margin-bottom: 10px;">' + title + '</' + title_tag+'>';
+    }
+
+    makeButton(title, href, addStyle, alt) {
+        return '<a style="'+ this.BUTTON_STYLE + addStyle + '" href="' + href + '" title="' + (alt || href) + '">' + title + '</a>';
+    }
+
+    makeListLabel(itemName, addStyle) {
+        return '<span style="float: left; ' + addStyle + '">' + itemName + '</span> ';
+    }
+
+    makeListButton(buttonName, href, addButtonStyle, alt) {
+        return this.makeButton(buttonName, href,  "float: right; " + addButtonStyle, alt);
+    }
+
+    makeList(items, addListStyle, addItemStyle) {
+        let list = '<ul style="' + this.LIST_STYLE + addListStyle + '">';
+        items.forEach((item) => {
+            list += '<li style="' + this.ITEM_STYLE + addItemStyle + '">' + item + '</li>';
+        });
+        list += '</ul>';
+        return list;
+    }
+
+    showMenu(who, contents, title, settings) {
+        settings = settings || {};
+        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
+        title = (title && title != '') ? this.makeTitle(title, settings.title_tag || '') : '';
+        sendChat(who, settings.whisper + '<div style="' + this.MENU_STYLE + '">' + title + contents + '</div>', null, {noarchive:true});
+    }
+}
+
+class WildShapeMenu extends MenuHelper
+{
+    constructor() {
+        super();
+        this.CMD = {};
+        this.CMD["ROOT"]            = API.CMD.ROOT + API.CMD.SEP;
+        this.CMD["CONFIG"]          = this.CMD.ROOT + API.CMD.CONFIG;
+        this.CMD["CONFIG_ADD"]      = this.CMD.CONFIG + API.CMD.SEP + API.CMD.ADD + API.CMD.SEP;
+        this.CMD["CONFIG_REMOVE"]   = this.CMD.CONFIG + API.CMD.SEP + API.CMD.REMOVE + API.CMD.SEP;
+        this.CMD["CONFIG_EDIT"]     = this.CMD.CONFIG + API.CMD.SEP + API.CMD.EDIT + API.CMD.SEP;
+        this.CMD["CONFIG_RESET"]    = this.CMD.CONFIG + API.CMD.SEP + API.CMD.RESET;
+
+        this["SHAPE_SIZES"] = API.SHAPE_SIZES.join("|");
+    }
+
+    showEditShape(shifterKey, shapeKey) {
+        const cmdShapeEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
+        const cmdRemove = this.CMD.CONFIG_REMOVE;
+        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
+
+        const shifter = state[API.STATENAME][API.DATA_SHIFTERS][shifterKey];
+
+        let obj = shifter[API.FIELDS.SHAPES][shapeKey];
+        let listItems = [];
+        if(obj)
         {
-            return {
-                token: tokenObj,
-                tokenName: name,
-                target: obj
-
-            };
+            listItems.push(this.makeListLabel("Name: &lt;" + shapeKey + "&gt;") + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.NAME + API.CMD.SEP + "?{Edit Name|" + shapeKey + "}"));
+            listItems.push(this.makeListLabel("Character: &lt;" + obj[API.FIELDS.CHARACTER] + "&gt;") + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.CHARACTER + API.CMD.SEP + "?{Edit Character|" + obj[API.FIELDS.CHARACTER] + "}"));
+            listItems.push(this.makeListLabel("Size: " + obj[API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + shapeKey + API.CMD.SEP + API.FIELDS.SIZE + API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
         }
-        else
+
+        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + API.CMD.SEP + API.FIELDS.TARGET.SHAPE + API.CMD.SEP + shifterKey + API.CMD.SEP + shapeKey, ' width: 100%');
+        const editShifterButton = this.makeButton("Edit Shifter: " + shifterKey, cmdShifterEdit + shifterKey, ' width: 100%');
+
+        let contents = this.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
+        this.showMenu(API.NAME, contents, API.NAME + ': ' + shifterKey + " - " + shapeKey);
+    }
+
+    showEditShifter(shifterKey) {
+        const cmdShapeEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
+        const cmdShapeAdd = this.CMD.CONFIG_ADD + API.FIELDS.TARGET.SHAPE + API.CMD.SEP;
+        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
+        const cmdRemove = this.CMD.CONFIG_REMOVE;
+
+        const obj = state[API.STATENAME][API.DATA_SHIFTERS][shifterKey];
+        const objSettings = obj[API.FIELDS.SETTINGS];
+        const objShapes = obj[API.FIELDS.SHAPES];
+
+        let listItems = [];
+        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Settings:</b></p>"));
+        let listSettings = [];
         {
-            sendChat(API.NAME, "Cannot find selected ShapeShifter: " + name);
+            listSettings.push(this.makeListLabel("Token Name: &lt;" + shifterKey + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.NAME + API.CMD.SEP + "?{Edit Name|" + shifterKey + "}"));
+            listSettings.push(this.makeListLabel("Character: &lt;" + objSettings[API.FIELDS.CHARACTER]+"&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.CHARACTER + API.CMD.SEP + "?{Edit Character|" + objSettings[API.FIELDS.CHARACTER] + "}"));
+            listSettings.push(this.makeListLabel("Size: &lt;" + objSettings[API.FIELDS.SIZE] + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.SIZE + API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
+            listSettings.push(this.makeListLabel("Shapes Prefix: &lt;" + objSettings[API.FIELDS.SHAPE_PREFIX] + "&gt;") + this.makeListButton("Edit", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.SHAPE_PREFIX + API.CMD.SEP + "?{Edit Shapes Prefix" + (!objSettings[API.FIELDS.SHAPE_PREFIX] ? "" : ("|" + objSettings[API.FIELDS.SHAPE_PREFIX])) + "}"));
+            listSettings.push(this.makeListLabel("Is Druid: &lt;" + objSettings[API.FIELDS.ISDRUID] + "&gt;") + this.makeListButton("Toggle", cmdShifterEdit + shifterKey + API.CMD.SEP + API.FIELDS.ISDRUID));
         }
+        listItems.push(this.makeList(listSettings, " padding-left: 10px"));
 
-        return null
+        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add Shape", cmdShapeAdd + shifterKey + API.CMD.SEP + "?{Shape Name}"));
+        let listShapes = [];
+        {
+            _.each(objShapes, (value, key) =>
+            {
+                listShapes.push(this.makeListLabel(key) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + API.CMD.SEP + key));
+            });
+        }
+        listItems.push(this.makeList(listShapes, " padding-left: 10px"));
+
+        const deleteShifterButton = this.makeButton("Delete: " + shifterKey, cmdRemove + "?{Are you sure?|no|yes}" + API.CMD.SEP + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP + shifterKey, ' width: 100%');
+        const showShiftersButton = this.makeButton("Show ShapeShifters", this.CMD.ROOT + API.CMD.SHOW_SHIFTERS, ' width: 100%');
+
+        let contents = this.makeList(listItems) + deleteShifterButton + '<hr>' + showShiftersButton;
+        this.showMenu(API.NAME, contents, API.NAME + ': ' + shifterKey);
+    }
+
+    showShifters() {
+        const cmdShifterAdd = this.CMD.CONFIG_ADD + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
+        const cmdShifterEdit = this.CMD.CONFIG_EDIT + API.FIELDS.TARGET.SHIFTER + API.CMD.SEP;
+
+        let listItems = [];
+        _.each(state[API.STATENAME][API.DATA_SHIFTERS], (value, key) => {
+            listItems.push(this.makeListLabel(key) + this.makeListButton("Edit", cmdShifterEdit + key));
+        });
+
+        const addShifterButton = this.makeButton("Add ShapeShifter", cmdShifterAdd + "?{Token Name}" + API.CMD.SEP + "?{Character Name in Journal}", ' width: 100%');
+        const configButton = this.makeButton("Main Menu", this.CMD.CONFIG, ' width: 100%');
+
+        let contents = this.makeList(listItems) + addShifterButton + '<hr>' + configButton;
+        this.showMenu(API.NAME, contents, API.NAME + ': ShapeShifters');
+    }
+
+    showConfigMenu(first) {
+        const apiCmdBase = this.CMD.ROOT;
+
+        const showShiftersButton = this.makeButton("Display ShapeShifters", apiCmdBase + API.CMD.SHOW_SHIFTERS, ' width: 100%');
+
+        let listItems = [
+            this.makeListLabel("Commands Separator: '" + API.CMD.SEP + "'"),
+            this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+        ];
+
+        //const exportButton = this.makeButton('Export Config', this.CMD.CONFIG + API.CMD.SEP + API.CMD.EXPORT, ' width: 100%');
+        //const importButton = this.makeButton('Import Config', this.CMD.CONFIG + API.CMD.SEP + API.CMD.IMPORT + API.CMD.SEP + '?{Config}', ' width: 100%');
+        const resetButton = this.makeButton('Reset Config', this.CMD.CONFIG_RESET, ' width: 100%');
+
+        let title_text = API.NAME + ((first) ? ': First Time Setup' : ': Config');
+        let contents = showShiftersButton
+                        + '<hr>' + this.makeList(listItems)
+                        + '<hr>' + resetButton;
+
+        this.showMenu(API.NAME, contents, title_text);
+    }
+
+    showShapeShiftMenu(who, shifterKey, shapes) {
+        const cmdShapeShift = this.CMD.ROOT + API.CMD.SHIFT + API.CMD.SEP + shifterKey + API.CMD.SEP;
+
+        let buttons = this.makeButton(shifterKey, cmdShapeShift + API.DEFAULT_SHAPE, ' width: 100%');
+        
+        _.each(shapes, (value, key) => {
+            buttons += this.makeButton(key, cmdShapeShift + key, ' width: 100%');
+        });
+
+        this.showMenu(API.NAME, buttons, API.NAME + ': ' + shifterKey + ' ShapeShift', {whisper: who});
+    }
+}
+
+
+var WildShape = WildShape || (function() {
+    'use strict';
+    const MENU = new WildShapeMenu();
+    const UTILS = new Utils();
+
+    const sortByKey = (unordered) => {
+        let ordered = {};
+        _.each(Object.keys(unordered).sort(function(a, b){return a.toLowerCase().localeCompare(b.toLowerCase());}), (key) => {
+            ordered[key] = unordered[key];
+        });
+
+        return ordered;
+    };
+
+    const sortShifters = () => {
+        // order shifters
+        state[API.STATENAME][API.DATA_SHIFTERS] = sortByKey(state[API.STATENAME][API.DATA_SHIFTERS]);
+    };
+
+    const sortShapes = (shifter) => {
+        // order shapes
+        shifter[API.FIELDS.SHAPES] = sortByKey(shifter[API.FIELDS.SHAPES]);
     };
 
     const getCreatureSize = (targetSize) => {        
         return targetSize ? Math.max(_.indexOf(API.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0;
     };
 
-    const copyAttribute = (fromId, toId, fromAttrName, onlyIfGreater = true, createAttr = false, toPrefix, toSuffix) => {
-        if(!toPrefix)
-            toPrefix = "";
-        if(!toSuffix)
-            toSuffix = "";
+    const findShapeShifter = (selectedToken) => {
+        let tokenObj = getObj(selectedToken._type, selectedToken._id);
+        
+        //const id = tokenObj.get("represents");
+        //const targetKey = _.findKey(state[API.STATENAME][API.DATA_SHIFTERS], function(s) { return s[API.FIELDS.SETTINGS][API.FIELDS.ID] == id; });
+        //if (targetKey)
 
-        const toAttrName = toPrefix + fromAttrName + toSuffix;
+        const targetKey = tokenObj.get("name");
+        const target = state[API.STATENAME][API.DATA_SHIFTERS][targetKey];
 
-        //sendChat(API.NAME, "setting attribute: " + toAttrName + ", from: " + fromAttrName);
-        var fromAttr = getAttrByName(fromId, fromAttrName);
-        var toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
-        if (!toAttr) {
-            if(createAttr)
+        if(target)
+        {
+            
+            const targetCharacter = findObjs({ type: 'character', id: target[API.FIELDS.SETTINGS][API.FIELDS.ID] })[0];
+
+            if(targetCharacter)
             {
-                createObj('attribute', {
-                    characterid: toId,
-                    name: toName,
-                    current: fromAttr,
-                    max: fromAttr
-                });
+                return {
+                    token: tokenObj,
+                    shifterKey: targetKey,
+                    shifter: target,
+                    shifterCharacter: targetCharacter,
+                };
             }
             else
-            {
-                sendChat(API.NAME, "ERROR: Cannot find attribute " + toAttrName + " on character " + toId)
-            }
+                UTILS.chatError("Cannot find ShapeShifter for token: " + tokenObj.get("name") + ", id : " + id + ", character id: " + target[API.FIELDS.SETTINGS][API.FIELDS.ID]);
         }
-        else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
-            toAttr.set("current", fromAttr);
+        else
+            UTILS.chatError("Cannot find ShapeShifter for token: " + targetKey);
+
+        return null;
     };
 
-    const shapeShift = (selectedToken, settings, targetShapeObj) => {
-        const defaultCharacter = findObjs({ type: 'character', name: settings[API.FIELDS.CHARACTER] })[0];
-        if (!defaultCharacter)
+    const doShapeShift = (who, obj, targetShapeObj) => {
+        /*
         {
-            sendChat(API.NAME, "ERROR: cannot find default character = " + settings[API.FIELDS.CHARACTER]);
-            return;
-        }
-
+            token: tokenObj,
+            shifterKey: targetKey,
+            shifter: target,
+            shifterCharacter: targetCharacter,
+        };
+*/
         if(targetShapeObj)
         {
-            const targetName = settings[API.FIELDS.SETTINGS][API.FIELDS.SHAPE_PREFIX] + targetShapeObj[API.FIELDS.CHARACTER];
+            const targetName = obj.shifter[API.FIELDS.SETTINGS][API.FIELDS.SHAPE_PREFIX] + targetShapeObj[API.FIELDS.CHARACTER];
             const targetCharacter = findObjs({ type: 'character', name: targetName })[0];
             if (!targetCharacter)
             {
-                sendChat(API.NAME, "ERROR: cannot find target character = " + targetName);
-                return;
+                UTILS.chatErrorToPlayer(who, "Cannot find target character = " + targetName);
+                return false;
             }
             const targetCharacterId = targetCharacter.get('id');
 
             if(getAttrByName(targetCharacterId, 'npc', 'current') == 1)
             {
-                const targetImg = getCleanImgsrc(targetCharacter.get('avatar'));
+                const targetImg = UTILS.getCleanImgsrc(targetCharacter.get('avatar'));
                 if (targetImg === undefined)
                 {
-                    sendChat(API.NAME, "ERROR: the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
-                    return;
+                    UTILS.chatErrorToPlayer(who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
+                    return false;
                 }
 
                 let targetSize =  getCreatureSize(targetShapeObj[API.FIELDS.SIZE]);
                 if (targetSize === 0)
                 {
                     targetSize = getAttrByName(targetCharacterId, "token_size");
+                    if(!targetSize)
+                        targetSize = 1;
                 }
 
                 if (API.DEBUG)
                 {
-                    sendChat(API.NAME, "====== TARGET STATS ======");
-                    sendChat(API.NAME, "token_size = " + getAttrByName(targetCharacterId, "token_size"));
-                    sendChat(API.NAME, "controlledby = " + defaultCharacter.get("controlledby"));
-                    sendChat(API.NAME, "avatar = " + targetImg);
-                    sendChat(API.NAME, "hp = " + getAttrByName(targetCharacterId, 'hp', 'max'));
-                    sendChat(API.NAME, "ac = " + getAttrByName(targetCharacterId, 'npc_ac'));
-                    sendChat(API.NAME, "npc speed = " + getAttrByName(targetCharacterId, 'npc_speed'));
-                    sendChat(API.NAME, "npc speed bar = " + getAttrByName(targetCharacterId, 'npc_speed').split(' ')[0]);
+                    UTILS.chat("====== TARGET STATS ======");
+                    UTILS.chat("token_size = " + getAttrByName(targetCharacterId, "token_size"));
+                    UTILS.chat("controlledby = " + obj.shifterCharacter.get("controlledby"));
+                    UTILS.chat("avatar = " + targetImg);
+                    UTILS.chat("hp = " + getAttrByName(targetCharacterId, 'hp', 'max'));
+                    UTILS.chat("ac = " + getAttrByName(targetCharacterId, 'npc_ac'));
+                    UTILS.chat("npc speed = " + getAttrByName(targetCharacterId, 'npc_speed'));
+                    UTILS.chat("npc speed bar = " + getAttrByName(targetCharacterId, 'npc_speed').split(' ')[0]);
                 }
 
-                const copyAttrNames = ["intelligence", "wisdom", "charisma"]
-                const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"]
+                if (obj.shifter[API.FIELDS.SETTINGS][API.FIELDS.ISDRUID])
+                {
+                    sendChat("copy attributes");
 
-                _.each(copyAttrNames, function (attrName) {
-                    _.each(copyAttrVariations, function (attrVar) {
-                        copyAttribute(settings[API.FIELDS.ID], targetCharacterId, attrName + attrVar, false);
+                    const copyAttrNames = ["intelligence", "wisdom", "charisma"];
+                    const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"];
+
+                    _.each(copyAttrNames, function (attrName) {
+                        _.each(copyAttrVariations, function (attrVar) {
+                            UTILS.copyAttribute(obj.shifter[API.FIELDS.SETTINGS][API.FIELDS.ID], targetCharacterId, attrName + attrVar, "", "", false);
+                        });
                     });
-                });
-
 /*
                 //npc_saving_flag: 1
                 // npc_str/dex/con/wis/int/cha_save + _flag
@@ -562,9 +615,12 @@ var WildShape = WildShape || (function() {
                     });
                 });
 */
-                targetCharacter.set({controlledby: defaultCharacter.get("controlledby")});
+                }
 
-                selectedToken.set({
+                const shifterControlledBy = obj.shifterCharacter.get("controlledby");
+                targetCharacter.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                
+                obj.token.set({
                     imgsrc: targetImg,
                     represents: targetCharacterId,
                     bar1_link: 'None',
@@ -577,17 +633,20 @@ var WildShape = WildShape || (function() {
                     height: 70 * targetSize,
                     width: 70 * targetSize,
                 });
+
+                return true;
             }
             else
             {
-                sendChat(API.NAME, "Cannot shift into a non-pc character");
+                UTILS.chatErrorToPlayer(who, "Cannot shift into a non-pc character");
+                return false;
             }
         }
         else
         {
-            const targetCharacter = defaultCharacter;
-            const targetCharacterId = settings[API.FIELDS.ID];
-            let targetSize = getCreatureSize(settings[API.FIELDS.SIZE]);
+            const targetCharacter = obj.shifterCharacter;
+            const targetCharacterId = obj.shifter[API.FIELDS.SETTINGS][API.FIELDS.ID];
+            let targetSize = getCreatureSize(obj.shifter[API.FIELDS.SETTINGS][API.FIELDS.SIZE]);
 
             // auto doesn't work on characters for now
             if (targetSize == 0)
@@ -598,14 +657,14 @@ var WildShape = WildShape || (function() {
                 const dt = JSON.parse(defaulttoken);
                 if (dt)
                 {
-                    tokenImg = getCleanImgsrc(dt.imgsrc);
+                    tokenImg = UTILS.getCleanImgsrc(dt.imgsrc);
                 }
                 else
                 {
-                    tokenImg = getCleanImgsrc(targetCharacter.get('avatar'));
+                    tokenImg = UTILS.getCleanImgsrc(targetCharacter.get('avatar'));
                 }
 
-                selectedToken.set({
+                obj.token.set({
                     imgsrc: tokenImg,
                     represents: targetCharacterId,
                     bar1_value: getAttrByName(targetCharacterId, "hp", 'current'),
@@ -619,6 +678,8 @@ var WildShape = WildShape || (function() {
                     width: 70 * targetSize,
                 });
             });
+
+            return true;
         }
     };
 
@@ -633,327 +694,383 @@ var WildShape = WildShape || (function() {
                 {
                     if (!msg.selected)
                     {
-                        sendChat(API.NAME, "Please select a token then run: " + API.CMD.ROOT);
+                        if (playerIsGM(msg.playerid))
+                        {
+                            MENU.showConfigMenu();
+                        }
+                        else
+                        {
+                            UTILS.chatToPlayer(msg.who, API.CMD.USAGE);
+                        }
                         return;
                     }
 
                     const obj = findShapeShifter(msg.selected[0]);
-                    if (includes(msg.playerid))
+                    if (obj)
                     {
-                        MENU.showShapeShift(obj.tokenName, obj.target[API.FIELDS.SETTINGS][API.FIELDS.SHAPES]);                        
+                        const controlledby = obj.shifterCharacter.get("controlledby");
+                        if (playerIsGM(msg.playerid) || controlledby.search(msg.playerid) >= 0 || controlledby.search("all") >= 0)
+                        {
+                            MENU.showShapeShiftMenu(msg.who, obj.shifterKey, obj.shifter[API.FIELDS.SHAPES]);
+                        }
+                        else
+                        {
+                            UTILS.chatErrorToPlayer(msg.who, "Trying to shapeshift on a token you don't have control over");
+                        }
                     }
-                    else
-                    {
-                        sendChat(API.NAME, "Trying to shapeshift on token you don't have control over");
+                    else {
+                        UTILS.chatErrorToPlayer(msg.who, "Cannot find ShapeShifter for the selected token");
                     }
-                    return
+                    return;
                 }
-                else if (playerIsGM(msg.playerid))
+                else 
                 {
                     let cmd = args.shift();
-                    switch (cmd)
+
+                    if (cmd == API.CMD.SHIFT)
                     {
-                        case API.CMD.SHOW_SHIFTERS:
-                        {
-                            MENU.showShifters();
-                        }
-                        break;
+                        const shifterName = args.shift();
+                        const shapeName = args.shift();
 
-                        case API.CMD.CONFIG:
+                        let shape = null;
+
+                        const obj = findShapeShifter(msg.selected[0]);
+                        if(obj)
                         {
-                            switch (args.shift())
+                            const controlledby = obj.shifterCharacter.get("controlledby");
+                            if (playerIsGM(msg.playerid) || controlledby.search(msg.playerid) >= 0 || controlledby.search("all") >= 0)
                             {
-                                case API.CMD.ADD:
+                                if (shapeName.toLowerCase() != API.DEFAULT_SHAPE)
                                 {
-                                    switch (args.shift())
+                                    const shape = obj.shifter[API.FIELDS.SHAPES][shapeName];
+                                    if (shape)
                                     {
-                                        case API.FIELDS.TARGET.SHIFTER:
+                                        if (doShapeShift(msg.who, obj, shape))
+                                            sendChat("character|"+obj.shifterCharacter.get("id"), "Transforming into " + shapeName);
+                                    }
+                                    else
+                                    {
+                                        UTILS.chatErrorToPlayer(msg.who, "Cannot find shape " + shapeName + " for ShapeShifter: " + obj.tokenName);
+                                    }
+                                }
+                                else
+                                {
+                                    if (doShapeShift(msg.who, obj))
+                                        sendChat("character|"+obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterKey);
+                                }   
+                            }
+                            else
+                            {
+                                UTILS.chatToPlayer(msg.who, "Trying to shapeshift on a token you don't have control over");
+                            }
+                        }
+                    }
+                    else if (playerIsGM(msg.playerid))
+                    {
+                        switch (cmd)
+                        {
+                            case API.CMD.SHOW_SHIFTERS:
+                            {
+                                MENU.showShifters();
+                            }
+                            break;
+
+                            case API.CMD.CONFIG:
+                            {
+                                switch (args.shift())
+                                {
+                                    case API.CMD.ADD:
+                                    {
+                                        switch (args.shift())
                                         {
-                                            const targetID = args.shift().trim();
-                                            if (targetID && targetID.length > 0)
+                                            case API.FIELDS.TARGET.SHIFTER:
                                             {
-                                                let targetName = targetID; 
-                                                let target = state[API.STATENAME][API.DATA_SHIFTERS][targetID];
-                                                if(!target)
+                                                const targetID = args.shift();
+                                                if (targetID && targetID.length > 0)
                                                 {
-                                                    target = {};
+                                                    let targetName = targetID; 
+                                                    let target = state[API.STATENAME][API.DATA_SHIFTERS][targetID];
+                                                    if(!target)
+                                                    {
+                                                        let charName = args.shift().trim();
+                                                        let charObj = findObjs({ type: 'character', name: charName });
+                                                        if(charObj && charObj.length == 1)
+                                                        {
+                                                            target = {};
 
-                                                    let targetSettings = {}
-                                                    targetSettings[API.FIELDS.CHARACTER] = targetName;
-                                                    targetSettings[API.FIELDS.SIZE] = API.DEFAULT_SHIFTER_SIZE;
-                                                    targetSettings[API.FIELDS.SHAPE_PREFIX] = "";
+                                                            let targetSettings = {};
+                                                            targetSettings[API.FIELDS.ID] = charObj[0].get('id');
+                                                            targetSettings[API.FIELDS.CHARACTER] = charName;
+                                                            targetSettings[API.FIELDS.SIZE] = API.DEFAULT_SHIFTER_SIZE;
+                                                            targetSettings[API.FIELDS.SHAPE_PREFIX] = "";
+                                                            targetSettings[API.FIELDS.ISDRUID] = true;
 
-                                                    target[API.FIELDS.SETTINGS] = targetSettings;
-                                                    target[API.FIELDS.SHAPES] = {};
+                                                            target[API.FIELDS.SETTINGS] = targetSettings;
+                                                            target[API.FIELDS.SHAPES] = {};
 
-                                                    state[API.STATENAME][API.DATA_SHIFTERS][targetID] = target;
+                                                            state[API.STATENAME][API.DATA_SHIFTERS][targetID] = target;
 
-                                                    sortShifters();
+                                                            sortShifters();
+                                                            MENU.showShifters();
+                                                        }
+                                                        else
+                                                        {
+                                                            UTILS.chatError("Cannot find character [" + charName + "] in the journal");
+                                                        }
+
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("Trying to add ShapeShifter " + targetName + " which already exists");
+                                                    }
                                                 }
                                                 else
                                                 {
-                                                    sendChat(API.NAME, "ERROR: Trying to add ShapeShifter " + targetName + " which already exists");
+                                                    UTILS.chatError("Trying to add ShapeShifter without a name");
                                                 }
                                             }
-                                            else
+                                            break;
+
+                                            case API.FIELDS.TARGET.SHAPE:
                                             {
-                                                sendChat(API.NAME, "ERROR: Trying to add ShapeShifter without a name");
+                                                const targetName = args.shift();
+                                                const targetShapeID = args.shift().trim();
+                                                if (targetShapeID && targetShapeID.length > 0)
+                                                {
+                                                    let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];                    
+                                                    if (target) 
+                                                    {
+                                                        let targetShapeName = targetShapeID;
+
+                                                        let shape = {};
+                                                        shape[API.FIELDS.ID] = "";
+                                                        shape[API.FIELDS.CHARACTER] = targetShapeName;
+                                                        shape[API.FIELDS.SIZE] = API.DEFAULT_SHAPE_SIZE;
+                                                        target[API.FIELDS.SHAPES][targetShapeID] = shape;
+
+                                                        sortShapes(target);
+
+                                                        MENU.showEditShifter(targetName);
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("Trying to add shape to ShapeShifter " + targetName + " which doesn't exist");
+                                                        MENU.showShifters();
+                                                    }
+                                                }
                                             }
-
-                                            MENU.showShifters();
+                                            break;
                                         }
-                                        break;
+                                    }                                
+                                    break;
 
-                                        case API.FIELDS.TARGET.SHAPE:
+                                    case API.CMD.REMOVE:
+                                    {
+                                        if (args.shift() == 'no')
+                                            return;
+
+                                        switch (args.shift())
                                         {
-                                            const targetName = args.shift();
-                                            const targetShapeID = args.shift().trim();
-                                            if (targetShapeID && targetShapeID.length > 0)
+                                            case API.FIELDS.TARGET.SHIFTER:
                                             {
-                                                let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];                    
+                                                const targetName = args.shift();
+                                                if (targetName)
+                                                {
+                                                    if(state[API.STATENAME][API.DATA_SHIFTERS][targetName])
+                                                    {
+                                                        delete state[API.STATENAME][API.DATA_SHIFTERS][targetName];
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("Trying to delete ShapeShifter " + targetName + " which doesn't exists");
+                                                    }
+
+                                                }
+                                                else
+                                                {
+                                                    UTILS.chatError("Trying to delete a ShapeShifter without providing a name");
+                                                }
+
+                                                MENU.showShifters();
+                                            }
+                                            break;
+
+                                            case API.FIELDS.TARGET.SHAPE:
+                                            {
+                                                const targetName = args.shift();
+                                                const targetShape = args.shift();
+                                                let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
                                                 if (target) 
                                                 {
-                                                    let targetShapeName = targetShapeID;
-
-                                                    let shape = {}
-                                                    shape[API.FIELDS.CHARACTER] = targetShapeName;
-                                                    shape[API.FIELDS.SIZE] = API.DEFAULT_SHAPE_SIZE;
-                                                    target[API.FIELDS.SHAPES][targetShapeID] = shape;
-
-                                                    sortShapes(target);
+                                                    if (target[API.FIELDS.SHAPES][targetShape])
+                                                    {
+                                                        delete target[API.FIELDS.SHAPES][targetShape];
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("Trying to remove shape " + targetShape + " that doesn't exist from ShapeShifter " + targetName);
+                                                    }
 
                                                     MENU.showEditShifter(targetName);
                                                 }
                                                 else
                                                 {
-                                                    sendChat(API.NAME, "ERROR: Trying to add shape to ShapeShifter " + targetName + " which doesn't exist");
+                                                    UTILS.chatError("Trying to remove shape from ShapeShifter " + targetName + " which doesn't exist");
                                                     MENU.showShifters();
                                                 }
                                             }
+                                            break;
                                         }
-                                        break;
                                     }
-                                }                                
-                                break;
+                                    break;
 
-                                case API.CMD.REMOVE:
-                                {
-                                    if (args.shift() == 'no')
-                                        return;
-
-                                    switch (args.shift())
+                                    case API.CMD.EDIT:
                                     {
-                                        case API.FIELDS.TARGET.SHIFTER:
+                                        switch (args.shift())
                                         {
-                                            const targetName = args.shift();
-                                            if (targetName)
+                                            case API.FIELDS.TARGET.SHIFTER:
                                             {
-                                                if(state[API.STATENAME][API.DATA_SHIFTERS][targetName])
-                                                {
-                                                    delete state[API.STATENAME][API.DATA_SHIFTERS][targetName];
-                                                }
-                                                else
-                                                {
-                                                    sendChat(API.NAME, "ERROR: Trying to delete ShapeShifter " + targetName + " which doesn't exists");
-                                                }
-
-                                            }
-                                            else
-                                            {
-                                                sendChat(API.NAME, "ERROR: Trying to delete a ShapeShifter without providing a name");
-                                            }
-
-                                            MENU.showShifters();
-                                        }
-                                        break;
-
-                                        case API.FIELDS.TARGET.SHAPE:
-                                        {
-                                            const targetName = args.shift();
-                                            const targetShape = args.shift();
-                                            let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
-                                            if (target) 
-                                            {
-                                                if (target[API.FIELDS.SHAPES][targetShape])
-                                                {
-                                                    delete target[API.FIELDS.SHAPES][targetShape];
-                                                }
-                                                else
-                                                {
-                                                    sendChat(API.NAME, "ERROR: Trying to remove shape " + targetShape + " that doesn't exist from ShapeShifter " + targetName);
-                                                }
-
-                                                MENU.showEditShifter(targetName);
-                                            }
-                                            else
-                                            {
-                                                sendChat(API.NAME, "ERROR: Trying to remove shape from ShapeShifter " + targetName + " which doesn't exist");
-                                                MENU.showShifters();
-                                            }
-                                        }
-                                        break;
-                                    }
-                                }
-                                break;
-
-                                case API.CMD.EDIT:
-                                {
-                                    switch (args.shift())
-                                    {
-                                        case API.FIELDS.TARGET.SHIFTER:
-                                        {
-                                            let targetName = args.shift();
-                                            let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
-                                            if (target)
-                                            {
-                                                const field = args.shift();
-                                                if (field)
-                                                {
-                                                    let newValue = args.shift();
-                                                    if(field == API.FIELDS.ID)
-                                                    {
-                                                        let oldTargetName = targetName; 
-                                                        targetName = newValue.trim();
-
-                                                        if (targetName && targetName.length > 0)
-                                                        {
-                                                            state[API.STATENAME][API.DATA_SHIFTERS][targetName] = target;
-                                                            delete state[API.STATENAME][API.DATA_SHIFTERS][oldTargetName];
-                                                            sortShifters();
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        target[API.FIELDS.SETTINGS][field] = newValue;
-                                                    }
-                                                }
-
-                                                MENU.showEditShifter(targetName);
-                                            }
-                                            else
-                                            {
-                                                sendChat(API.NAME, "ERROR: cannot find shifter [" + targetName + "]");
-                                            }
-                                        }
-                                        break;
-
-                                        case API.FIELDS.TARGET.SHAPE:
-                                        {
-                                            const targetName = args.shift();
-                                            let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
-                                            if (target)
-                                            {
-                                                let shapeName = args.shift();
-                                                let targetShape = target[API.FIELDS.SHAPES][shapeName];
-                                                if (targetShape)
+                                                let targetName = args.shift();
+                                                let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
+                                                if (target)
                                                 {
                                                     const field = args.shift();
                                                     if (field)
                                                     {
+                                                        let isValueSet = false;
                                                         let newValue = args.shift();
-                                                        if(field == API.FIELDS.ID)
+                                                        if(field == API.FIELDS.NAME)
                                                         {
-                                                            let oldShapeName = shapeName; 
-                                                            shapeName = newValue.trim();
-                                                            if (shapeName && shapeName.length > 0)
+                                                            let oldTargetName = targetName; 
+                                                            targetName = newValue.trim();
+
+                                                            if (targetName && targetName.length > 0)
                                                             {
-                                                                target[API.FIELDS.SHAPES][shapeName] = targetShape;
-                                                                delete target[API.FIELDS.SHAPES][oldShapeName];
-                                                                sortShapes(target);
+                                                                state[API.STATENAME][API.DATA_SHIFTERS][targetName] = target;
+                                                                delete state[API.STATENAME][API.DATA_SHIFTERS][oldTargetName];
+                                                                sortShifters();
+                                                                isValueSet = true;
                                                             }
+                                                        }
+                                                        else if(field == API.FIELDS.CHARACTER)
+                                                        {
+                                                            let charObj = findObjs({ type: 'character', name: newValue });
+                                                            if(charObj && charObj.length == 1)
+                                                            {
+                                                                target[API.FIELDS.SETTINGS][API.FIELDS.ID] = charObj[0].get('id');
+                                                                target[API.FIELDS.SETTINGS][field] = newValue;
+                                                                isValueSet = true;
+                                                            }
+                                                            else
+                                                            {
+                                                                UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                                                            }
+                                                        }
+                                                        else if(field == API.FIELDS.ISDRUID)
+                                                        {
+
+                                                            target[API.FIELDS.SETTINGS][API.FIELDS.ISDRUID] = !target[API.FIELDS.SETTINGS][API.FIELDS.ISDRUID];
+                                                            isValueSet = true;
                                                         }
                                                         else
                                                         {
-                                                            targetShape[field] = newValue;
+                                                            target[API.FIELDS.SETTINGS][field] = newValue;
+                                                            isValueSet = true;
                                                         }
+
+                                                        if(isValueSet)
+                                                            MENU.showEditShifter(targetName);
                                                     }
-                                                    MENU.showEditShape(targetName, shapeName);
+                                                    else
+                                                        MENU.showEditShifter(targetName);
                                                 }
                                                 else
                                                 {
-                                                    sendChat(API.NAME, "ERROR: cannot find shape [" + shapeName + "]");
+                                                    UTILS.chatError("cannot find shifter [" + targetName + "]");
                                                 }
                                             }
-                                            else
+                                            break;
+
+                                            case API.FIELDS.TARGET.SHAPE:
                                             {
-                                                sendChat(API.NAME, "ERROR: cannot find shifter [" + targetName + "]");
+                                                const targetName = args.shift();
+                                                let target = state[API.STATENAME][API.DATA_SHIFTERS][targetName];
+                                                if (target)
+                                                {
+                                                    let shapeName = args.shift();
+                                                    let targetShape = target[API.FIELDS.SHAPES][shapeName];
+                                                    if (targetShape)
+                                                    {
+                                                        const field = args.shift();
+                                                        if (field)
+                                                        {
+                                                            let newValue = args.shift();
+                                                            if(field == API.FIELDS.NAME)
+                                                            {
+                                                                let oldShapeName = shapeName; 
+                                                                shapeName = newValue.trim();
+                                                                if (shapeName && shapeName.length > 0)
+                                                                {
+                                                                    target[API.FIELDS.SHAPES][shapeName] = targetShape;
+                                                                    delete target[API.FIELDS.SHAPES][oldShapeName];
+                                                                    sortShapes(target);
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                targetShape[field] = newValue;
+                                                            }
+                                                        }
+                                                        MENU.showEditShape(targetName, shapeName);
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("cannot find shape [" + shapeName + "]");
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    UTILS.chatError("cannot find shifter [" + targetName + "]");
+                                                }
+
                                             }
-
                                         }
                                     }
-                                }
-                                break;
+                                    break;
 
-                                case API.CMD.RESET:
-                                {
-                                    setDefaults(true);
-                                }
-                                break;
-
-                                default: MENU.sendConfigMenu();
-                            }
-                        }
-                        break;
-
-                        case API.CMD.HELP:
-                        {
-                            sendChat(API.NAME, API.CMD.USAGE);
-                        }
-                        break;
-
-                        default:
-                        {
-                            // reconstruct target shape name from list of arguments
-                            const targetShapeName = cmd + " " + args.join(" ");
-
-                            if (!msg.selected)
-                            {
-                                sendChat(API.NAME, "Please select a token then run: " + API.CMD.USAGE);
-                                return;
-                            }
-
-                            let targetDruidShape = null;
-                            _.each(msg.selected, function(o) 
-                            {
-                                const obj = findShapeShifter(o);
-                                if(obj)
-                                {
-                                    if (params.toLowerCase() != API.DEFAULT_SHAPE)
+                                    case API.CMD.RESET:
                                     {
-                                        const targetDruidShape = obj.target[API.FIELDS.SHAPES][targetShapeName];
-                                        if (targetDruidShape)
-                                        {
-                                            sendChat(API.NAME, obj.tokenName + " is transforming into: " + targetDruidShape[API.FIELDS.CHARACTER]);
-                                            shapeShift(obj.token, obj.target, targetDruidShape);
-                                        }
-                                        else
-                                        {
-                                            sendChat(API.NAME, "ERROR: Cannot find shape " + targetShapeName + " for ShapeShifter: " + obj.tokenName);
-                                        }
+                                        setDefaults(true);
                                     }
-                                    else
-                                    {
-                                        sendChat(API.NAME,  obj.tokenName + " is transforming back into the default shape");
-                                        shapeShift(obj.token, obj.target);
-                                    }
+                                    break;
+
+                                    default: MENU.showConfigMenu();
                                 }
-                            });
+                            }
+                            break;
+
+                            case API.CMD.HELP:
+                            {
+                                UTILS.chat(API.CMD.USAGE);
+                            }
+                            break;
                         }
                     }
                 }
             }
         }
-    }
+    };
 
     const setDefaults = (reset) => {
-        let defaults = {}
+        let defaults = {};
 
         defaults[API.DATA_CONFIG] = {
             version: API.VERSION,
-        }
-        defaults[API.DATA_SHIFTERS] = {}
+        };
+        defaults[API.DATA_SHIFTERS] = {};
 
-        defaults[API.DATA_SHIFTERS] = ShapeShiftersExample;
+        // set test data
+        // defaults[API.DATA_SHIFTERS] = ShapeShiftersExample;
 
         if (!state[API.STATENAME][API.DATA_CONFIG] || reset) {
             state[API.STATENAME][API.DATA_CONFIG] = defaults[API.DATA_CONFIG];
@@ -977,7 +1094,7 @@ var WildShape = WildShape || (function() {
                     }
                     else
                     {
-                        sendChat(API.NAME, "trying to initialize invalid character: " + s[API.FIELDS.SETTINGS][API.FIELDS.CHARACTER]);
+                        UTILS.chatError("trying to initialize invalid character: " + s[API.FIELDS.SETTINGS][API.FIELDS.CHARACTER]);
                     }
                 }
 
@@ -987,7 +1104,7 @@ var WildShape = WildShape || (function() {
         }
 
         if (!state[API.STATENAME].hasOwnProperty('firsttime') || reset) {
-            MENU.sendConfigMenu(true);
+            MENU.showConfigMenu(true);
             state[API.STATENAME].firsttime = false;
         }            
     };
