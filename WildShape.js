@@ -99,7 +99,7 @@ const WS_API = {
 
         SHIFT : "shift",
 
-        SHOW_SHIFTERS : "showshifters",        
+        SHOW_SHIFTERS : "showshifters",
     },
 
     // fields that can be changed by commands
@@ -149,10 +149,7 @@ class WildUtils {
             return parts[1]+'thumb'+parts[3]+(parts[4]?parts[4]:`?${Math.round(Math.random()*9999999)}`);
         }
         return;
-    }
-
-    
-    
+    }    
 
     copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
         if(!toPrefix)
@@ -447,7 +444,7 @@ class WildShapeMenu extends WildMenuHelper
             listSettings.push(this.makeListLabelValue("Token Name", shifterKey) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.NAME + WS_API.CMD.SEP + "&#64;{target|token_name}"));// + "?{Edit Name|" + shifterKey + "}"));
             listSettings.push(this.makeListLabelValue("Character", objSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.CHARACTER + WS_API.CMD.SEP + "?{Edit Character|" + shifterPcs + "}"));
             listSettings.push(this.makeListLabelValue("Size", objSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.SIZE + WS_API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
-            listSettings.push(this.makeListLabelValue("Is Druid", objSettings[WS_API.FIELDS.ISDRUID]) + this.makeListButton("Toggle", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.ISDRUID));
+            listSettings.push(this.makeListLabelValue("Is Druid", objSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.ISDRUID));
             listSettings.push(this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"));
         }
         listItems.push(this.makeList(listSettings, " padding-left: 10px"));
@@ -567,7 +564,6 @@ var WildShape = WildShape || (function() {
         {
             
             const targetCharacter = findObjs({ type: 'character', id: target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
-
             if(targetCharacter)
             {
                 return {
@@ -575,66 +571,126 @@ var WildShape = WildShape || (function() {
                     shifterKey: targetKey,
                     shifter: target,
                     shifterCharacter: targetCharacter,
+                    shifterControlledby: targetCharacter.get("controlledby")
                 };
             }
             else
-                UTILS.chatError("Cannot find ShapeShifter for token: " + tokenObj.get("name") + ", id : " + id + ", character id: " + target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID]);
+                UTILS.chatError("Cannot find ShapeShifter: " + targetKey + ", character id: " + target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID]);
         }
         else
-            UTILS.chatError("Cannot find ShapeShifter for token: " + targetKey);
+            UTILS.chatError("Cannot find ShapeShifter: " + targetKey);
 
         return null;
     };
 
-    const doShapeShift = (who, shifterToken, targetShapeObj) => {
-        /*
+    const getCharacterData = (shiftData, isNpc) =>
+    {
+        let data = {};
+        
+        let targetImg;
+        let targetSize = 1;
+
+        let hpName = "hp";
+        let acName;
+        let speedName;
+        
+        if(isNpc)
         {
-            token: tokenObj,
-            shifterKey: targetKey,
-            shifter: target,
-            shifterCharacter: targetCharacter,
-        };
-*/
-        if(targetShapeObj)
-        {
-            const targetCharacter = findObjs({ type: 'character', id: targetShapeObj[WS_API.FIELDS.ID] })[0];
-            if (!targetCharacter)
+            acName = "npc_ac";    
+            speedName = "npc_speed";
+
+            targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
+            if (targetImg === undefined)
             {
-                UTILS.chatErrorToPlayer(who, "Cannot find target character = " + targetShapeObj[WS_API.FIELDS.CHARACTER] + " with id = " + targetShapeObj[WS_API.FIELDS.ID]);
+                UTILS.chatErrorToPlayer(shiftData.who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
+                return null;
+            }
+            
+            targetSize =  getCreatureSize(shiftData.targetShape[WS_API.FIELDS.SIZE]);
+            if (targetSize === 0)
+            {
+                targetSize = getAttrByName(shiftData.targetCharacterId, "token_size");
+                if(!targetSize)
+                    targetSize = 1;
+            }
+        }
+        else
+        {
+            acName = "ac";    
+            speedName = "speed";
+
+            shiftData.targetCharacter.get('_defaulttoken', function(defaulttoken) {
+                const dt = JSON.parse(defaulttoken);
+                targetImg = dt ? UTILS.getCleanImgsrc(dt.imgsrc) : UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
+            });
+            if (targetImg === undefined)
+            {
+                UTILS.chatErrorToPlayer(shiftData.who, "canont find token or avatar image for PC " + shiftData.targetCharacterId);
+                return null;
+            }
+
+            targetSize = getCreatureSize(shiftData.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.SIZE]);
+            
+            // auto defaults to normal on PCs
+            if (targetSize == 0)
+                targetSize = 1;
+        }
+
+        let hpObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: hpName})[0];
+        let acObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: acName})[0];
+        let speedObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: speedName})[0];
+        
+        data.hp             = {};
+        data.hp.current     = hpObj.get('current');
+        data.hp.max         = hpObj.get('max');
+        data.hp.id          = hpObj.id;
+
+        data.ac             = {};
+        data.ac.current     = acObj.get('current');
+        data.ac.max         = acObj.get('max');
+        data.ac.id          = acObj.id;
+
+        data.speed          = {};
+        data.speed.current  = speedObj.get('current');
+        data.speed.max      = speedObj.get('max');
+        data.speed.id       = speedObj.id;
+
+        data.imgsrc = targetImg;
+        data.controlledby = shiftData.shifterControlledby;
+        data.tokenSize = targetSize;
+
+        return data;
+    };
+
+    const doShapeShift = (shiftData) => {
+        if(shiftData.targetShape)
+        {
+            shiftData.targetCharacterId = shiftData.targetShape[WS_API.FIELDS.ID];
+            shiftData.targetCharacter = findObjs({ type: 'character', id: shiftData.targetCharacterId })[0];
+            if (!shiftData.targetCharacter)
+            {
+                UTILS.chatErrorToPlayer(shiftData.who, "Cannot find target character = " + shiftData.targetShape[WS_API.FIELDS.CHARACTER] + " with id = " + shiftData.targetCharacterId);
                 return false;
             }
-            const targetCharacterId = targetCharacter.get('id');
 
-            if(getAttrByName(targetCharacterId, 'npc', 'current') == 1)
+            if(getAttrByName(shiftData.targetCharacterId, 'npc', 'current') == 1)
             {
-                const targetImg = UTILS.getCleanImgsrc(targetCharacter.get('avatar'));
-                if (targetImg === undefined)
-                {
-                    UTILS.chatErrorToPlayer(who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
-                    return false;
-                }
-
-                let targetSize =  getCreatureSize(targetShapeObj[WS_API.FIELDS.SIZE]);
-                if (targetSize === 0)
-                {
-                    targetSize = getAttrByName(targetCharacterId, "token_size");
-                    if(!targetSize)
-                        targetSize = 1;
-                }
+                const targetData = getCharacterData(shiftData, true);
+                if (!targetData)
+                    return;
 
                 if (WS_API.DEBUG)
                 {
                     UTILS.chat("====== TARGET STATS ======");
-                    UTILS.chat("token_size = " + getAttrByName(targetCharacterId, "token_size"));
-                    UTILS.chat("controlledby = " + shifterToken.shifterCharacter.get("controlledby"));
-                    UTILS.chat("avatar = " + targetImg);
-                    UTILS.chat("hp = " + getAttrByName(targetCharacterId, 'hp', 'max'));
-                    UTILS.chat("ac = " + getAttrByName(targetCharacterId, 'npc_ac'));
-                    UTILS.chat("npc speed = " + getAttrByName(targetCharacterId, 'npc_speed'));
-                    UTILS.chat("npc speed bar = " + getAttrByName(targetCharacterId, 'npc_speed').split(' ')[0]);
+                    UTILS.chat("token_size = " + targetData.tokenSize);
+                    UTILS.chat("controlledby = " + targetData.controlledby);
+                    UTILS.chat("avatar = " + targetData.imgsrc);
+                    UTILS.chat("hp = " + targetData.hp.current);
+                    UTILS.chat("ac = " + targetData.ac.current);
+                    UTILS.chat("npc speed = " + targetData.speed.current);
                 }
 
-                if (shifterToken.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID])
+                if (shiftData.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID])
                 {
                     sendChat("copy attributes");
 
@@ -643,7 +699,7 @@ var WildShape = WildShape || (function() {
 
                     _.each(copyAttrNames, function (attrName) {
                         _.each(copyAttrVariations, function (attrVar) {
-                            UTILS.copyAttribute(shifterToken.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID], targetCharacterId, attrName + attrVar, "", "", false);
+                            UTILS.copyAttribute(shiftData.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID], shiftData.targetCharacterId, attrName + attrVar, "", "", false);
                         });
                     });
 /*
@@ -661,66 +717,56 @@ var WildShape = WildShape || (function() {
 */
                 }
 
-                const shifterControlledBy = shifterToken.shifterCharacter.get("controlledby");
-                targetCharacter.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                shiftData.targetCharacter.set({controlledby: targetData.controlledby, inplayerjournals: targetData.controlledby});
                 
-                shifterToken.token.set({
-                    imgsrc: targetImg,
-                    represents: targetCharacterId,
+                shiftData.token.set({
+                    imgsrc: targetData.imgsrc,
+                    represents: shiftData.targetCharacterId,
                     bar1_link: 'None',
-                    bar1_value: getAttrByName(targetCharacterId, 'hp', 'max'),
-                    bar1_max: getAttrByName(targetCharacterId, 'hp', 'max'),
+                    bar1_value: targetData.hp.max,
+                    bar1_max: targetData.hp.max,
                     bar2_link: 'None',
-                    bar2_value: getAttrByName(targetCharacterId, 'npc_ac'),
+                    bar2_value: targetData.ac.current,
                     bar3_link: 'None',
-                    bar3_value: getAttrByName(targetCharacterId, 'npc_speed').split(' ')[0],
-                    height: 70 * targetSize,
-                    width: 70 * targetSize,
+                    bar3_value: targetData.speed.current.split(' ')[0],
+                    height: 70 * targetData.tokenSize,
+                    width: 70 * targetData.tokenSize,
                 });
 
                 return true;
             }
             else
             {
-                UTILS.chatErrorToPlayer(who, "Cannot shift into a non-pc character");
+                UTILS.chatErrorToPlayer(shiftData.who, "Cannot shift into a pc character");
                 return false;
             }
         }
         else
         {
-            const targetCharacter = shifterToken.shifterCharacter;
-            const targetCharacterId = shifterToken.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID];
-            let targetSize = getCreatureSize(shifterToken.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.SIZE]);
+            // transform back into default shifter character
+            const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
+            const targetCharacterId = shifterSettings[WS_API.FIELDS.ID];
+            const isNpc = shifterSettings[WS_API.FIELDS.ISNPC];
 
-            // auto doesn't work on characters for now
-            if (targetSize == 0)
-                targetSize = 1;
+            shiftData.targetCharacterId = shifterSettings[WS_API.FIELDS.ID];
+            shiftData.targetCharacter = shiftData.shifterCharacter;  
 
-            targetCharacter.get('_defaulttoken', function(defaulttoken) {
-                let tokenImg;
-                const dt = JSON.parse(defaulttoken);
-                if (dt)
-                {
-                    tokenImg = UTILS.getCleanImgsrc(dt.imgsrc);
-                }
-                else
-                {
-                    tokenImg = UTILS.getCleanImgsrc(targetCharacter.get('avatar'));
-                }
+            const targetData = getCharacterData(shiftData, isNpc);
+            if (!targetData)
+                return;
 
-                shifterToken.token.set({
-                    imgsrc: tokenImg,
-                    represents: targetCharacterId,
-                    bar1_value: getAttrByName(targetCharacterId, "hp", 'current'),
-                    bar1_max: getAttrByName(targetCharacterId, "hp", 'max'),
-                    bar1_link: findObjs({type: "attribute", characterid: targetCharacterId, name: 'hp'})[0].id,
-                    bar2_value: getAttrByName(targetCharacterId, "ac", 'current'),
-                    bar2_link: findObjs({type: "attribute", characterid: targetCharacterId, name: 'ac'})[0].id,
-                    bar3_value: getAttrByName(targetCharacterId, "speed", 'current'),
-                    bar3_link: findObjs({type: "attribute", characterid: targetCharacterId, name: 'speed'})[0].id,
-                    height: 70 * targetSize,
-                    width: 70 * targetSize,
-                });
+            shiftData.token.set({
+                imgsrc: targetData.imgsrc,
+                represents: shiftData.targetCharacterId,
+                bar1_value: targetData.hp.current,
+                bar1_max: targetData.hp.max,
+                bar1_link: targetData.hp.id,
+                bar2_value: targetData.ac.current,
+                bar2_link: targetData.ac.id,
+                bar3_value: targetData.speed.current,
+                bar3_link: targetData.speed.id,
+                height: 70 * targetData.tokenSize,
+                width: 70 * targetData.tokenSize,
             });
 
             return true;
@@ -752,8 +798,7 @@ var WildShape = WildShape || (function() {
                     const obj = findShapeShifter(msg.selected[0]);
                     if (obj)
                     {
-                        const controlledby = obj.shifterCharacter.get("controlledby");
-                        if (playerIsGM(msg.playerid) || controlledby.search(msg.playerid) >= 0 || controlledby.search("all") >= 0)
+                        if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
                         {
                             MENU.showShapeShiftMenu(msg.who, obj.shifterKey, obj.shifter[WS_API.FIELDS.SHAPES]);
                         }
@@ -781,16 +826,17 @@ var WildShape = WildShape || (function() {
                         const obj = findShapeShifter(msg.selected[0]);
                         if(obj)
                         {
-                            const controlledby = obj.shifterCharacter.get("controlledby");
-                            if (playerIsGM(msg.playerid) || controlledby.search(msg.playerid) >= 0 || controlledby.search("all") >= 0)
+                            if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
                             {
                                 if (shapeName.toLowerCase() != WS_API.DEFAULTS.SHAPE)
                                 {
                                     const shape = obj.shifter[WS_API.FIELDS.SHAPES][shapeName];
                                     if (shape)
                                     {
-                                        if (doShapeShift(msg.who, obj, shape))
-                                            sendChat("character|"+obj.shifterCharacter.get("id"), "Transforming into " + shapeName);
+                                        obj.who = msg.who;
+                                        obj.targetShape = shape;
+                                        if (doShapeShift(obj))
+                                            sendChat("character|" + obj.shifterCharacter.get("id"), "Transforming into " + shapeName);
                                     }
                                     else
                                     {
@@ -799,8 +845,9 @@ var WildShape = WildShape || (function() {
                                 }
                                 else
                                 {
-                                    if (doShapeShift(msg.who, obj))
-                                        sendChat("character|"+obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterKey);
+                                    obj.who = msg.who;
+                                    if (doShapeShift(obj))
+                                        sendChat("character|" + obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterKey);
                                 }   
                             }
                             else
@@ -1062,11 +1109,33 @@ var WildShape = WildShape || (function() {
                                                     let targetShape = target[WS_API.FIELDS.SHAPES][shapeName];
                                                     if (targetShape)
                                                     {
-                                                        const field = args.shift();
+                                                        let field = args.shift();
                                                         if (field)
                                                         {
                                                             let isValueSet = false;
                                                             let newValue = args.shift();
+                                                            if(field == WS_API.FIELDS.CHARACTER)
+                                                            {
+                                                                let shapeObj = findObjs({ type: 'character', name: newValue });
+                                                                if(shapeObj && shapeObj.length == 1)
+                                                                {
+                                                                    targetShape[WS_API.FIELDS.ID] = shapeObj[0].get('id');
+                                                                    const oldCharacterName = targetShape[field];
+                                                                    targetShape[field] = newValue;
+                                                                    isValueSet = true;
+                                                                    
+                                                                    if (oldCharacterName == targetShape[WS_API.FIELDS.ID])
+                                                                    {
+                                                                        // also rename id
+                                                                        field = WS_API.FIELDS.NAME;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                                                                }
+                                                            }                                                            
+
                                                             if(field == WS_API.FIELDS.NAME)
                                                             {
                                                                 let oldShapeName = shapeName; 
@@ -1086,21 +1155,7 @@ var WildShape = WildShape || (function() {
                                                                     }
                                                                 }
                                                             }
-                                                            else if(field == WS_API.FIELDS.CHARACTER)
-                                                            {
-                                                                let shapeObj = findObjs({ type: 'character', name: newValue });
-                                                                if(shapeObj && shapeObj.length == 1)
-                                                                {
-                                                                    targetShape[WS_API.FIELDS.ID] = shapeObj[0].get('id');
-                                                                    targetShape[field] = newValue;
-                                                                    isValueSet = true;
-                                                                }
-                                                                else
-                                                                {
-                                                                    UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
-                                                                }
-                                                            }                                                            
-                                                            else
+                                                            else if(!isValueSet)
                                                             {
                                                                 targetShape[field] = newValue;
                                                                 isValueSet = true;
