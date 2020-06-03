@@ -129,7 +129,7 @@ class WildShapeMenu extends WildMenu
         const cmdShapeAdd = this.CMD.CONFIG_ADD + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP;
         const cmdShifterEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP;
         const cmdRemove = this.CMD.CONFIG_REMOVE;
-        const cmdImport = this.CMD.CONFIG + WS_API.CMD.IMPORT;
+        const cmdImport = this.CMD.CONFIG + WS_API.CMD.SEP + WS_API.CMD.IMPORT;
 
         const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId];
         const shifterSettings = shifter[WS_API.FIELDS.SETTINGS];

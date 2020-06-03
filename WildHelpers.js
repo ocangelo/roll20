@@ -129,37 +129,31 @@ class WildUtils {
 
 
     findNestedFolder(folderData, name) {
-       
+       sendChat("findNestedFolder", name);
+
         var folderStack = [];
         folderStack.push(folderData);
-        
+        var targetFolder;
+
         _.each(folderStack.pop(), function(obj) {
-            if(_.isObject(obj))
+            if(!targetFolder && _.isObject(obj))
             {
+                sendChat("findNestedFolder", "checking: " + obj.n);
+
                 if (obj.n.toLowerCase() === name.toLowerCase()) {
-                    return obj;
+                   sendChat("findNestedFolder", "found");
+
+                   targetFolder = obj;
                 }
                 else
                 {
+                   sendChat("findNestedFolder", "add to stack " + obj.i);
                     folderStack.push(obj.i);
                 }
             }
         });
 
-        return [];
-/*
-        var targetFolder;
-
-        _.each(folderData, function(obj) {
-            if (!_.isObject(obj) || targetFolder) return;
-            if (obj.n.toLowerCase() === name.toLowerCase()) {
-                targetFolder = obj;
-                return;
-            }
-            targetFolder = this.findNestedFolder(obj.i, name);
-        });
         return targetFolder;
-        */
     }
 
     getCharactersInFolder(folder) {
@@ -169,7 +163,15 @@ class WildUtils {
             .map(function(id) { return getObj('character', id); })
             .reject(function(char) { return !char; })
             .value();
+
         sendChat("test", JSON.stringify(charactersInFolder));
+
+        // rename
+        //_.each(charactersInFolder, function(char){
+        //    const charObj = findObjs({ type: 'character', id: char.id })[0];
+        //    if (charObj)
+        //        charObj.set("name", "test-"+charObj.get("name"));
+        //});
     }
 
     getObjectFromFolder(path, folderData, getFolder) {
