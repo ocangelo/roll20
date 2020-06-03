@@ -10,53 +10,6 @@ importing a monster from the MonsterManual:
 /*jshint -W069 */
 /*jshint -W014 */
 
-/*
-const ShapeShiftersExample =
-{
-    Helia: { // this needs to match the "visible name" of you character token
-        settings : {
-            character: "Copy of Helia", // character name in the journal
-            size: "gargantuan",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
-            isdruid: true,
-            isnpc: false,
-        },
-
-        shapes: {
-            GiantToad: {                // this matches the input to the !ws command
-                character: "Giant Toad",  // optional, name of the character/npc in the journal (ignoring the prefix), default matches the key "GiantToad"
-                size: "auto",
-            },
-
-            "Adult_Black_Dragon": {
-                character: "dragon",
-                size: "auto",              // optional, ["auto", "normal", "large", "huge", "gargantuan"], null defaults to NPC token_size attribute
-            },
-        }
-    },
-
-    Lavinia: {
-        settings : {
-            character: "Copy of Lavinia",
-            size: "normal",             // optional, string in ["normal", "large", "huge", "gargantuan"], null defaults to normal
-            isdruid: true,
-            isnpc: false,
-        },
-
-        shapes: {
-            GiantToad: {                // this matches the input to the !ws command
-                character: "Giant Toad",  // optional, name of the character/npc in the journal (ignoring the prefix), default matches the key "GiantToad"
-                size: "huge",
-            },
-
-            "Adult_Black_Dragon": {
-                character: "dragon",
-                size: "gargantuan",              // optional, ["auto", "normal", "large", "huge", "gargantuan"], null defaults to NPC token_size attribute
-            },
-        }
-    }
-};
-*/
-
 const WS_API = {
     NAME : "WildShape",
     VERSION : "0.1",
@@ -125,268 +78,7 @@ const WS_API = {
     }
 };
 
-class WildUtils {
-    constructor(name) {
-        this.apiName = name || "API";
-    }
-
-    chat(msg) {
-        sendChat(this.apiName, "/w gm " + msg);
-    }
-
-    chatToPlayer(playerid, msg) {
-        sendChat(this.apiName, "/w " + playerid + " " + msg);
-    }
-
-    chatError(msg) {
-        sendChat(this.apiName, "/w gm ERROR: " + msg);
-    }
-
-    chatErrorToPlayer(playerid, msg) {
-        sendChat(this.apiName, "/w " + playerid + " ERROR: " + msg);
-    }
-
-    getCleanImgsrc(imgsrc) {
-        let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
-        if(parts) {
-            return parts[1]+'thumb'+parts[3]+(parts[4]?parts[4]:`?${Math.round(Math.random()*9999999)}`);
-        }
-        return;
-    }    
-
-    copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
-        if(!toPrefix)
-            toPrefix = "";
-        if(!toSuffix)
-            toSuffix = "";
-
-        const toAttrName = toPrefix + fromAttrName + toSuffix;
-
-        //this.chat("setting attribute: " + toAttrName + ", from: " + fromAttrName);
-        var fromAttr = getAttrByName(fromId, fromAttrName);
-        var toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
-        if (!toAttr) {
-            if(createAttr)
-            {
-                createObj('attribute', {
-                    characterid: toId,
-                    name: toName,
-                    current: fromAttr,
-                    max: fromAttr
-                });
-            }
-            else
-            {
-                this.chatError("Cannot find attribute " + toAttrName + " on character " + toId);
-            }
-        }
-        else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
-            toAttr.set("current", fromAttr);
-    }
-
-    duplicateCharacter(o) {
-        const simpleObj = (o)=>JSON.parse(JSON.stringify(o));
-
-        let c = simpleObj(o.character);
-        let oldCid = o.character.id;
-        delete c.id;
-        c.name=`(COPY) ${c.name}`;
-        c.avatar=getCleanImgsrc(c.avatar)||'';
-
-        let newC = createObj('character',c);
-        o.token.set('represents',newC.id);
-        setDefaultTokenForCharacter(newC,o.token);
-        o.token.set('represents',oldCid);
-
-        _.each(findObjs({type:'attribute',characterid:oldCid}),(a)=>{
-            let sa = simpleObj(a);
-            delete sa.id;
-            delete sa._type;
-            delete sa._characterid;
-            sa.characterid = newC.id;
-            createObj('attribute',sa);
-        });
-        _.each(findObjs({type:'ability',characterid:oldCid}),(a)=>{
-            let sa = simpleObj(a);
-            delete sa.id;
-            delete sa._type;
-            delete sa._characterid;
-            sa.characterid = newC.id;
-            createObj('ability',sa);
-        });
-    }
-
-    getCharactersWithAttr(attributeName) {
-        /* start the chain with all the attribute objects named 'player-name' */
-        return _
-        .chain(filterObjs((o)=>{
-            return (o.get('type')==='attribute' && o.get('name') === attributeName);
-        }))
-
-        /* IN: Array of Attribute Objects */
-        /* extract the characterid from each */
-        .reduce((m,o)=>{
-            let obj={};
-            obj.cid=o.get('characterid');
-            obj[attributeName]=o;
-            m.push(obj);
-            return m;
-        },
-        []
-        )
-
-        /* IN: Array of Objects with 
-        * Character ID in property cid 
-        * attribute in [attributeName]
-        */
-        /* add characters to the objects */
-        .map((o)=>{
-            o.char=getObj('character',o.cid);
-            return o;
-        })
-
-        /* IN: Array of Objects with 
-        * Character ID in property cid 
-        * attribute in [attributeName]
-        * character in property char
-        */
-        /* remove any entries that didn't have Characters */
-        .reject( (o)=> {return _.isUndefined(o.char);} )
-
-        /* IN: Array of Character Objects */
-        /* Unwrap Chain and return the array */
-        .value();
-
-        /*var charsWithPN = getCharactersWithAttrByName('player-name');
-        _.each(charsWithPN,(o)=>{
-            log(`Character ${o.char.get('name')} has player-name of ${o['player-name'].get('current')}/${o['player-name'].get('max')}`);
-        });*/
-    }
-
-    getCharactersWithAttrValue(attribute, value) {
-        return (this.getCharactersWithAttrByName(attribute) || {}).filter( (o)=> {return o[attribute].get('current') == value; } );
-    }
-
-    getPCs() {
-        return this.getCharactersWithAttr("ideals");
-    }
-
-    getNPCs() {
-        return this.getCharactersWithAttr("npc");
-    }
-
-    getPCNames() {
-        return this.getPCs().reduce((m,o)=>{m.push(o.char.get('name')); return m; }, []);             
-    }
-
-    getNPCNames() {
-        return this.getNPCs().reduce((m,o)=>{m.push(o.char.get('name')); return m; }, []);
-    }
-
-
-    findNestedFolder(folderData, name) {
-       
-        var folderStack = [];
-        folderStack.push(folderData);
-        
-        _.each(folderStack.pop(), function(obj) {
-            if(_.isObject(obj))
-            {
-                if (obj.n.toLowerCase() === name.toLowerCase()) {
-                    return obj;
-                }
-                else
-                {
-                    folderStack.push(obj.i);
-                }
-            }
-        });
-
-        return [];
-/*
-        var targetFolder;
-
-        _.each(folderData, function(obj) {
-            if (!_.isObject(obj) || targetFolder) return;
-            if (obj.n.toLowerCase() === name.toLowerCase()) {
-                targetFolder = obj;
-                return;
-            }
-            targetFolder = this.findNestedFolder(obj.i, name);
-        });
-        return targetFolder;
-        */
-    }
-
-    getCharactersInFolder(folder) {
-        var folderData = JSON.parse(Campaign().get('journalfolder'));
-        var charactersInFolder = _.chain(this.findNestedFolder(folderData, folder).i)
-            .filter(function(obj) { return _.isString(obj); })
-            .map(function(id) { return getObj('character', id); })
-            .reject(function(char) { return !char; })
-            .value();
-        sendChat("test", JSON.stringify(charactersInFolder));
-    }
-
-    getObjectFromFolder(path, folderData, getFolder) {
-        if (path.indexOf('.') < 0) {
-            if (getFolder) {
-                return _.find(folderData, (o) => o.n && o.n.toLowerCase() === path.toLowerCase()).i;
-            }
-            return _.find(folderData, (o) => o.get && o.get('name').toLowerCase() === path.toLowerCase());
-        }
-        path = path.split('.');
-        var folder = path.shift();
-        path = path.join('.');
-        folderData = _.find(folderData, (o) => o.n && o.n.toLowerCase() === folder.toLowerCase());
-        return getObjectFromFolder(path, folderData.i);
-    }
-}
-
-class WildMenuHelper {
-    constructor()
-    {
-        this.MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px; ";
-        this.BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; ";
-        this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 20px; overflow:hidden; ";
-        this.ITEM_STYLE = "overflow:hidden;";
-    }
-
-    makeTitle(title, title_tag) {
-        title_tag = (title_tag && title_tag !== '') ? title_tag : 'h3';
-        return '<' + title_tag + ' style="margin-bottom: 10px;">' + title + '</' + title_tag+'>';
-    }
-
-    makeButton(title, href, addStyle, alt) {
-        return '<a style="'+ this.BUTTON_STYLE + addStyle + '" href="' + href + '" title="' + (alt || href) + '">' + title + '</a>';
-    }
-
-    makeListLabel(itemName, addStyle) {
-        return '<span style="float: left; ' + addStyle + '">' + itemName + '</span> ';
-    }
-
-    makeListButton(buttonName, href, addButtonStyle, alt) {
-        return this.makeButton(buttonName, href,  "float: right; " + addButtonStyle, alt);
-    }
-
-    makeList(items, addListStyle, addItemStyle) {
-        let list = '<ul style="' + this.LIST_STYLE + addListStyle + '">';
-        items.forEach((item) => {
-            list += '<li style="' + this.ITEM_STYLE + addItemStyle + '">' + item + '</li>';
-        });
-        list += '</ul>';
-        return list;
-    }
-
-    showMenu(who, contents, title, settings) {
-        settings = settings || {};
-        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
-        title = (title && title != '') ? this.makeTitle(title, settings.title_tag || '') : '';
-        sendChat(who, settings.whisper + '<div style="' + this.MENU_STYLE + '">' + title + contents + '</div>', null, {noarchive:true});
-    }
-}
-
-class WildShapeMenu extends WildMenuHelper
+class WildShapeMenu extends WildMenu
 {
     constructor() {
         super();
@@ -407,39 +99,39 @@ class WildShapeMenu extends WildMenuHelper
         return this.makeListLabel(name + ": &lt;" + (value || defaultValue) + "&gt;");
     }
 
-    showEditShape(shifterKey, shapeKey) {
+    showEditShape(shifterId, shapeId) {
         const cmdShapeEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP;
         const cmdRemove = this.CMD.CONFIG_REMOVE;
         const cmdShifterEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP;
 
-        const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
+        const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId];
 
         var npcs = this.UTILS.getNPCNames().sort().join('|');
 
-        let obj = shifter[WS_API.FIELDS.SHAPES][shapeKey];
+        let obj = shifter[WS_API.FIELDS.SHAPES][shapeId];
         let listItems = [];
         if(obj)
         {
-            listItems.push(this.makeListLabelValue("Name", shapeKey) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + WS_API.CMD.SEP + shapeKey + WS_API.CMD.SEP + WS_API.FIELDS.NAME + WS_API.CMD.SEP + "?{Edit Name|" + shapeKey + "}"));
-            listItems.push(this.makeListLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + WS_API.CMD.SEP + shapeKey + WS_API.CMD.SEP + WS_API.FIELDS.CHARACTER + WS_API.CMD.SEP + "?{Edit Character|" + npcs + "}"));
-            listItems.push(this.makeListLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + WS_API.CMD.SEP + shapeKey + WS_API.CMD.SEP + WS_API.FIELDS.SIZE + WS_API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
+            listItems.push(this.makeListLabelValue("Name", shapeId) + this.makeListButton("Edit", cmdShapeEdit + shifterId + WS_API.CMD.SEP + shapeId + WS_API.CMD.SEP + WS_API.FIELDS.NAME + WS_API.CMD.SEP + "?{Edit Name|" + shapeId + "}"));
+            listItems.push(this.makeListLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShapeEdit + shifterId + WS_API.CMD.SEP + shapeId + WS_API.CMD.SEP + WS_API.FIELDS.CHARACTER + WS_API.CMD.SEP + "?{Edit Character|" + npcs + "}"));
+            listItems.push(this.makeListLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + shifterId + WS_API.CMD.SEP + shapeId + WS_API.CMD.SEP + WS_API.FIELDS.SIZE + WS_API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
         }
 
-        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP + shifterKey + WS_API.CMD.SEP + shapeKey, ' width: 100%');
-        const editShifterButton = this.makeButton("Edit Shifter: " + shifterKey, cmdShifterEdit + shifterKey, ' width: 100%');
+        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP + shifterId + WS_API.CMD.SEP + shapeId, ' width: 100%');
+        const editShifterButton = this.makeButton("Edit Shifter: " + shifterId, cmdShifterEdit + shifterId, ' width: 100%');
 
         let contents = this.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
-        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterKey + " - " + shapeKey);
+        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterId + " - " + shapeId);
     }
 
-    showEditShifter(shifterKey) {
+    showEditShifter(shifterId) {
         const cmdShapeEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP;
         const cmdShapeAdd = this.CMD.CONFIG_ADD + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP;
         const cmdShifterEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP;
         const cmdRemove = this.CMD.CONFIG_REMOVE;
-        const cmdImport = this.CMD.ROOT + WS_API.CMD.IMPORT;
+        const cmdImport = this.CMD.CONFIG + WS_API.CMD.IMPORT;
 
-        const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
+        const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId];
         const shifterSettings = shifter[WS_API.FIELDS.SETTINGS];
         const shifterShapes = shifter[WS_API.FIELDS.SHAPES];
 
@@ -457,32 +149,32 @@ class WildShapeMenu extends WildMenuHelper
         listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Settings" + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + ":</b></p>");
         let listSettings = [];
         {
-            listSettings.push(this.makeListLabelValue("Token Name", shifterKey) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.NAME + WS_API.CMD.SEP + "&#64;{target|token_name}"));// + "?{Edit Name|" + shifterKey + "}"));
-            listSettings.push(this.makeListLabelValue("Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.CHARACTER + WS_API.CMD.SEP + "?{Edit Character|" + shifterPcs + "}"));
-            listSettings.push(this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.SIZE + WS_API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
-            listSettings.push(this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterKey + WS_API.CMD.SEP + WS_API.FIELDS.ISDRUID));
+            listSettings.push(this.makeListLabelValue("Token Name", shifterId) + this.makeListButton("Edit", cmdShifterEdit + shifterId + WS_API.CMD.SEP + WS_API.FIELDS.NAME + WS_API.CMD.SEP + "&#64;{target|token_name}"));// + "?{Edit Name|" + shifterId + "}"));
+            listSettings.push(this.makeListLabelValue("Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + WS_API.CMD.SEP + WS_API.FIELDS.CHARACTER + WS_API.CMD.SEP + "?{Edit Character|" + shifterPcs + "}"));
+            listSettings.push(this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + WS_API.CMD.SEP + WS_API.FIELDS.SIZE + WS_API.CMD.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
+            listSettings.push(this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterId + WS_API.CMD.SEP + WS_API.FIELDS.ISDRUID));
             listSettings.push(this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"));
         }
         listItems.push(this.makeList(listSettings, " padding-left: 10px"));
 
         // shapes section
-        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add", cmdShapeAdd + shifterKey + WS_API.CMD.SEP + "?{Target Shape|" + npcs + "}" + WS_API.CMD.SEP + "?{Simple Name (optional)}"));
+        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add", cmdShapeAdd + shifterId + WS_API.CMD.SEP + "?{Target Shape|" + npcs + "}" + WS_API.CMD.SEP + "?{Simple Name (optional)}"));
         let listShapes = [];
         {
-            _.each(shifterShapes, (value, shapeKey) =>
+            _.each(shifterShapes, (value, shapeId) =>
             {
-                listShapes.push(this.makeListLabel(shapeKey) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP + shifterKey + WS_API.CMD.SEP + shapeKey) + this.makeListButton("Edit", cmdShapeEdit + shifterKey + WS_API.CMD.SEP + shapeKey));
+                listShapes.push(this.makeListLabel(shapeId) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHAPE + WS_API.CMD.SEP + shifterId + WS_API.CMD.SEP + shapeId) + this.makeListButton("Edit", cmdShapeEdit + shifterId + WS_API.CMD.SEP + shapeId));
             });
         }
         listItems.push(this.makeList(listShapes, " padding-left: 10px"));
 
         // bottom buttons
         const importShapesButton = this.makeButton("Import Shapes", cmdImport + WS_API.CMD.SEP + "?{Folder Name}", ' width: 100%');
-        const deleteShifterButton = this.makeButton("Delete: " + shifterKey, cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP + shifterKey, ' width: 100%');
+        const deleteShifterButton = this.makeButton("Delete: " + shifterId, cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP + shifterId, ' width: 100%');
         const showShiftersButton = this.makeButton("Show ShapeShifters", this.CMD.ROOT + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
 
         let contents = this.makeList(listItems) + importShapesButton + deleteShifterButton + '<hr>' + showShiftersButton;
-        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterKey);
+        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterId);
     }
 
     showShifters() {
@@ -491,9 +183,9 @@ class WildShapeMenu extends WildMenuHelper
         const cmdRemove = this.CMD.CONFIG_REMOVE;
 
         let listItems = [];
-        _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (value, shifterKey) => {
-            const shifterSettings = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey][WS_API.FIELDS.SETTINGS];
-            listItems.push(this.makeListLabel(shifterKey + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP + shifterKey)+ this.makeListButton("Edit", cmdShifterEdit + shifterKey));
+        _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (value, shifterId) => {
+            const shifterSettings = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId][WS_API.FIELDS.SETTINGS];
+            listItems.push(this.makeListLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + WS_API.CMD.SEP + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP + shifterId)+ this.makeListButton("Edit", cmdShifterEdit + shifterId));
         });
 
         var pcs = this.UTILS.getPCNames().sort().join('|');
@@ -528,23 +220,23 @@ class WildShapeMenu extends WildMenuHelper
         this.showMenu(WS_API.NAME, contents, title_text);
     }
 
-    showShapeShiftMenu(who, playerid, shifterKey, shapes) {
-        const cmdShapeShift = this.CMD.ROOT + WS_API.CMD.SHIFT + WS_API.CMD.SEP + shifterKey + WS_API.CMD.SEP;
+    showShapeShiftMenu(who, playerid, shifterId, shapes) {
+        const cmdShapeShift = this.CMD.ROOT + WS_API.CMD.SHIFT + WS_API.CMD.SEP + shifterId + WS_API.CMD.SEP;
 
         let contents = '';
 
         if (playerIsGM(playerid))
         {
             const cmdShifterEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + WS_API.CMD.SEP;
-            contents += this.makeButton("Edit", cmdShifterEdit + shifterKey, ' width: 100%') + "<hr>";
+            contents += this.makeButton("Edit", cmdShifterEdit + shifterId, ' width: 100%') + "<hr>";
         }
 
-        contents += this.makeButton(shifterKey, cmdShapeShift + WS_API.DEFAULTS.SHAPE, ' width: 100%');
+        contents += this.makeButton(shifterId, cmdShapeShift + WS_API.DEFAULTS.SHAPE, ' width: 100%');
         _.each(shapes, (value, key) => {
             contents += this.makeButton(key, cmdShapeShift + key, ' width: 100%');
         });
 
-        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterKey + ' ShapeShift', {whisper: who});
+        this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterId + ' ShapeShift', {whisper: who});
     }
 }
 
@@ -577,26 +269,27 @@ var WildShape = WildShape || (function() {
         return targetSize ? Math.max(_.indexOf(WS_API.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0;
     };
 
-    const findShapeShifter = (selectedToken) => {
+    const findShifter = (selectedToken) => {
         let tokenObj = getObj(selectedToken._type, selectedToken._id);
         
         //const id = tokenObj.get("represents");
         //const targetKey = _.findKey(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], function(s) { return s[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] == id; });
         //if (targetKey)
 
-        const targetKey = tokenObj.get("name");
-        const target = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][targetKey];
+        const targetId = tokenObj.get("name");
+        const target = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][targetId];
 
         if(target)
         {
-            
-            const targetCharacter = findObjs({ type: 'character', id: target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
+            const targetCharacterId = target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID];
+            const targetCharacter = findObjs({ type: 'character', id: targetCharacterId })[0];
             if(targetCharacter)
             {
                 return {
                     token: tokenObj,
-                    shifterKey: targetKey,
+                    shifterId: targetId,
                     shifter: target,
+                    shifterCharacterId: targetCharacterId,
                     shifterCharacter: targetCharacter,
                     shifterControlledby: targetCharacter.get("controlledby")
                 };
@@ -755,8 +448,6 @@ var WildShape = WildShape || (function() {
         {
             if (shifterSettings[WS_API.FIELDS.ISDRUID])
             {
-                sendChat("copy attributes");
-
                 const copyAttrNames = ["intelligence", "wisdom", "charisma"];
                 const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"];
 
@@ -815,6 +506,8 @@ var WildShape = WildShape || (function() {
         }
 
         shifterSettings[WS_API.FIELDS.CURRENT_FORM] = shiftData.targetShapeName;
+        
+        return true;
     };
 
     const handleInput = (msg) => {
@@ -839,12 +532,12 @@ var WildShape = WildShape || (function() {
                         return;
                     }
 
-                    const obj = findShapeShifter(msg.selected[0]);
+                    const obj = findShifter(msg.selected[0]);
                     if (obj)
                     {
                         if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
                         {
-                            MENU.showShapeShiftMenu(msg.who, msg.playerid, obj.shifterKey, obj.shifter[WS_API.FIELDS.SHAPES]);
+                            MENU.showShapeShiftMenu(msg.who, msg.playerid, obj.shifterId, obj.shifter[WS_API.FIELDS.SHAPES]);
                         }
                         else
                         {
@@ -867,7 +560,7 @@ var WildShape = WildShape || (function() {
 
                         let shape = null;
 
-                        const obj = findShapeShifter(msg.selected[0]);
+                        const obj = findShifter(msg.selected[0]);
                         if(obj)
                         {
                             if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
@@ -881,7 +574,9 @@ var WildShape = WildShape || (function() {
                                         obj.targetShapeName = shapeName;
                                         obj.targetShape = shape;
                                         if (doShapeShift(obj))
-                                            sendChat("character|" + obj.shifterCharacter.get("id"), "Transforming into " + shapeName);
+                                        {
+                                            UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName);
+                                        }
                                     }
                                     else
                                     {
@@ -893,7 +588,7 @@ var WildShape = WildShape || (function() {
                                     obj.who = msg.who;
                                     obj.targetShapeName = WS_API.DEFAULTS.SHAPE;
                                     if (doShapeShift(obj))
-                                        sendChat("character|" + obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterKey);
+                                        UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterId);
                                 }   
                             }
                             else
@@ -1230,6 +925,7 @@ var WildShape = WildShape || (function() {
 
                                             }
                                         }
+
                                     }
                                     break;
 
@@ -1239,30 +935,30 @@ var WildShape = WildShape || (function() {
                                     }
                                     break;
 
+
+                                    case WS_API.CMD.IMPORT:
+                                    {
+                                        const folderName = args.shift();
+                                        UTILS.chat(folderName);
+                                        var folderCharacters = UTILS.getCharactersInFolder(folderName);
+                                        _.each(folderCharacters, function(obj) {
+                                            UTILS.chat(obj.get("name"));
+                                        });
+        /*
+        // usage:
+        var folderData = getFolderObjects('journalfolder');
+        var goblin13 = getObjectFromFolder('encounters.forest.level2.goblin #13', folderData);
+        var level2PlainsMonsters = getObjectFromFolder('encounters.plains.level2', folderData, true);
+        var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
+        */
+
+                                    }
+                                    break;
+
                                     default: MENU.showConfigMenu();
                                 }
                             }
                             break;
-
-                            case WS_API.CMD.IMPORT:
-                            {
-                                const folderName = args.shift();
-                                UTILS.chat(folderName);
-                                var folderCharacters = UTILS.getCharactersInFolder(folderName);
-                                _.each(folderCharacters, function(obj) {
-                                    UTILS.chat(obj.get("name"));
-                                });
-/*
-// usage:
-var folderData = getFolderObjects('journalfolder');
-var goblin13 = getObjectFromFolder('encounters.forest.level2.goblin #13', folderData);
-var level2PlainsMonsters = getObjectFromFolder('encounters.plains.level2', folderData, true);
-var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
-*/
-
-                            }
-                            break;
-
 
                             case WS_API.CMD.HELP:
                             {
