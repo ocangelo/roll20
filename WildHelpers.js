@@ -127,53 +127,101 @@ class WildUtils {
         return this.getNPCs().reduce((m,o)=>{m.push(o.char.get('name')); return m; }, []);
     }
 
-
-    findNestedFolder(folderData, name) {
-       sendChat("findNestedFolder", name);
-
-        var folderStack = [];
-        folderStack.push(folderData);
-        var targetFolder;
-
-        _.each(folderStack.pop(), function(obj) {
-            if(!targetFolder && _.isObject(obj))
+    // finds the folder 'name' anywhere in the journal
+    findInNestedFolder(folderData, name) {
+        let folderStack = [folderData];
+        
+        let currFolder = folderStack.shift();
+        while (currFolder)
+        {
+            let obj;
+            do 
             {
-                sendChat("findNestedFolder", "checking: " + obj.n);
+                obj = currFolder.shift();
+                if (obj && _.isObject(obj))
+                {
+                    if (obj.n.toLowerCase() === name.toLowerCase()) {
+                        return obj;
+                    }
+                    else
+                    {
+                        folderStack.push(obj.i);
+                    }
+                }
+            }
+            while (currFolder.length > 0);
 
-                if (obj.n.toLowerCase() === name.toLowerCase()) {
-                   sendChat("findNestedFolder", "found");
+            currFolder = folderStack.shift();
+        }
 
-                   targetFolder = obj;
+        return null;
+    }
+
+    // finds the folder 'name' anywhere in the journal
+    findFolder(folderData, fullpath) {
+        let currFolder = folderData;
+        
+        let paths = fullpath.split('/');
+        let currPath = paths.shift();
+
+        while (currFolder)
+        {
+
+            let found = false;
+            let obj;
+            do 
+            {
+                obj = currFolder.shift();
+                if (obj && _.isObject(obj))
+                {
+                    if (obj.n.toLowerCase() === currPath.toLowerCase()) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            while (currFolder.length > 0);
+
+            if (found)
+            {
+                currPath = paths.shift();
+                if (!currPath)
+                {
+                    return obj;
                 }
                 else
                 {
-                   sendChat("findNestedFolder", "add to stack " + obj.i);
-                    folderStack.push(obj.i);
+                    currFolder = obj.i;
                 }
             }
-        });
+            else
+                return null;
+        }
 
-        return targetFolder;
+        return null;
     }
+
 
     getCharactersInFolder(folder) {
-        var folderData = JSON.parse(Campaign().get('journalfolder'));
-        var charactersInFolder = _.chain(this.findNestedFolder(folderData, folder).i)
-            .filter(function(obj) { return _.isString(obj); })
-            .map(function(id) { return getObj('character', id); })
-            .reject(function(char) { return !char; })
-            .value();
+        var charactersInFolder = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
+        
+        if (charactersInFolder)
+        {
+            charactersInFolder = _.chain(charactersInFolder.i)
+                .filter(function(obj) { return _.isString(obj); })
+                .map(function(id) { return getObj('character', id); })
+                .reject(function(char) { return !char; })
+                .value();
+        }
+        else
+        {
+            this.chatError("Cannot find folder: " + folder);
+        }
 
-        sendChat("test", JSON.stringify(charactersInFolder));
-
-        // rename
-        //_.each(charactersInFolder, function(char){
-        //    const charObj = findObjs({ type: 'character', id: char.id })[0];
-        //    if (charObj)
-        //        charObj.set("name", "test-"+charObj.get("name"));
-        //});
+        return charactersInFolder;
     }
 
+    /* UNTESTED
     getObjectFromFolder(path, folderData, getFolder) {
         if (path.indexOf('.') < 0) {
             if (getFolder) {
@@ -188,7 +236,6 @@ class WildUtils {
         return getObjectFromFolder(path, folderData.i);
     }
 
-    /* UNTESTED
     duplicateCharacter(o) {
         const simpleObj = (o)=>JSON.parse(JSON.stringify(o));
 

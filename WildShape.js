@@ -939,19 +939,22 @@ var WildShape = WildShape || (function() {
                                     case WS_API.CMD.IMPORT:
                                     {
                                         const folderName = args.shift();
-                                        UTILS.chat(folderName);
                                         var folderCharacters = UTILS.getCharactersInFolder(folderName);
-                                        _.each(folderCharacters, function(obj) {
-                                            UTILS.chat(obj.get("name"));
-                                        });
-        /*
-        // usage:
-        var folderData = getFolderObjects('journalfolder');
-        var goblin13 = getObjectFromFolder('encounters.forest.level2.goblin #13', folderData);
-        var level2PlainsMonsters = getObjectFromFolder('encounters.plains.level2', folderData, true);
-        var randomLevel2PlainsMonster = _.shuffle(level2PlainsMonsters).shift();
-        */
 
+                                        // rename
+                                        let oldPrefix = "found - ";
+                                        let newPrefix = "meow - ";        
+                                        _.each(folderCharacters, function(char){
+                                            const charObj = findObjs({ type: 'character', id: char.id })[0];
+                                            if (charObj)
+                                            {
+                                                let name = charObj.get("name");
+                                                if(name.startsWith(oldPrefix)) {
+                                                    name = name.slice(oldPrefix.length);
+                                                    charObj.set("name", newPrefix + name);
+                                                }
+                                            }
+                                        });
                                     }
                                     break;
 
