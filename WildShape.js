@@ -89,7 +89,7 @@ const WS_API = {
         SIZE: "size",
         ISDRUID: "isdruid",
         ISNPC: "isnpc",
-        CURRENT_FORM: "currform",
+        CURRENT_SHAPE: "currshape",
 
         SEP: "sep",
 
@@ -170,15 +170,17 @@ class WildShapeMenu extends WildMenu
         else 
             shifterPcs = pcs;
 
+        let pcTag = shifterSettings[WS_API.FIELDS.ISNPC] ? "<i>(NPC)</i>" : " <i>(PC)</i>";
+
         // settings section
         let listItems = [];
-        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Settings" + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + ":</b></p>");
+        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Settings " + pcTag) + ":</b></p>");
         listItems.push(this.makeListLabel("Token name needs to match to be able to shapeshift", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
 
         let listSettings = [];
         {
             listSettings.push(this.makeListLabelValue("Token Name", shifterId) + this.makeListButton("Edit", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.NAME + this.SEP + "&#64;{target|token_name}"));// + "?{Edit Name|" + shifterId + "}"));
-            listSettings.push(this.makeListLabelValue("Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"));
+            listSettings.push(this.makeListLabelValue(pcTag + " Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"));
             listSettings.push(this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
             listSettings.push(this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.ISDRUID));
             listSettings.push(this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"));
@@ -186,7 +188,7 @@ class WildShapeMenu extends WildMenu
         listItems.push(this.makeList(listSettings, " padding-left: 10px"));
 
         // shapes section
-        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}" + this.SEP + "?{Simple Name (optional)}"));
+        listItems.push(this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}" + this.SEP + "?{Simple Name (optional)}") + this.makeListButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}" + this.SEP + "?{Simple Name (optional)}") );
         let listShapes = [];
         {
             _.each(shifterShapes, (value, shapeId) =>
@@ -281,7 +283,7 @@ class WildShapeMenu extends WildMenu
             contents += this.makeButton("Edit", cmdShifterEdit + shifterId, ' width: 100%') + "<hr>";
         }
 
-        contents += this.makeButton(shifterId, cmdShapeShift + WS_API.DEFAULTS.BASE_SHAPE, ' width: 100%');
+        contents += this.makeButton(shifterId, cmdShapeShift + WS_API.DEFAULTS.BASE_SHAPE, ' width: 100%') + "<hr>";
         _.each(shapes, (value, key) => {
             contents += this.makeButton(key, cmdShapeShift + key, ' width: 100%');
         });
@@ -683,22 +685,29 @@ var WildShape = WildShape || (function() {
                             if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
                             {
                                 obj.who = msg.who;
-                                obj.targetShapeName = shapeName;
+                                obj.targetShapeName = shapeName.toLowerCase();
 
-                                if (shapeName.toLowerCase() != WS_API.DEFAULTS.BASE_SHAPE)
+                                if (obj.targetShapeName != WS_API.DEFAULTS.BASE_SHAPE)
                                 {
-                                    const shape = obj.shifter[WS_API.FIELDS.SHAPES][shapeName];
-                                    if (shape)
+                                    if (obj.targetShapeName !== obj.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.CURRENT_SHAPE])
                                     {
-                                        obj.targetShape = shape;
-                                        if (doShapeShift(obj))
+                                        const shape = obj.shifter[WS_API.FIELDS.SHAPES][shapeName];
+                                        if (shape)
                                         {
-                                            UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
+                                            obj.targetShape = shape;
+                                            if (doShapeShift(obj))
+                                            {
+                                                UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            UTILS.chatErrorToPlayer(msg.who, "Cannot find shape " + shapeName + " for ShapeShifter: " + obj.shifterId);
                                         }
                                     }
                                     else
                                     {
-                                        UTILS.chatErrorToPlayer(msg.who, "Cannot find shape " + shapeName + " for ShapeShifter: " + obj.shifterId);
+                                        UTILS.chatErrorToPlayer(msg.who, "You are already transformed into " + shapeName);
                                     }
                                 }
                                 else
@@ -830,6 +839,18 @@ var WildShape = WildShape || (function() {
                                                 {
                                                     if(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey])
                                                     {
+                                                        let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
+                                                        _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
+                                                            if (shape)
+                                                            {
+                                                                const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+                                                                if (shapeCharacter)
+                                                                {
+                                                                    shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                                                }
+                                                            }
+                                                        });
+
                                                         delete state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
                                                     }
                                                     else
@@ -1125,12 +1146,12 @@ var WildShape = WildShape || (function() {
                                                     let folderShapes = UTILS.findCharactersInFolder(folderName, searchSubfolders);
                                                     if(folderShapes)
                                                     {
-                                                        _.each(folderShapes, function(shape) {
-                                                            if (WS_API.DEBUG)
-                                                            {
-                                                                UTILS.chat(JSON.stringify(shape));
-                                                            }
+                                                        if (WS_API.DEBUG)
+                                                        {
+                                                            _.each(folderShapes, function(shape) { UTILS.chat(JSON.stringify(shape)); });
+                                                        }
 
+                                                        _.each(folderShapes, function(shape) {
                                                             let shapeObj = findObjs({ type: 'character', id: shape.id })[0];                                                            
                                                             if (shapeObj)
                                                             {
@@ -1165,7 +1186,13 @@ var WildShape = WildShape || (function() {
                                                         });
 
                                                         sortShapes(shifter);
+
+                                                        UTILS.chat("Importing Shapes from folder [" + folderName + "] completed");
                                                         MENU.showEditShifter(shifterKey);
+                                                    }
+                                                    else
+                                                    {
+                                                        UTILS.chatError("Cannot find any shapes in the input folder  [" + folderName + "]");
                                                     }
                                                 }
                                                 else
