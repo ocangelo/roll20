@@ -1,26 +1,28 @@
+/*jshint -W083 */
+
 class WildUtils {
     constructor(apiName) {
         this.APINAME = apiName || "API";
     }
 
-    chat(msg) {
-        sendChat(this.APINAME, "/w gm " + msg, null, {noarchive:true});
+    chat(msg, callback = null, settings = {noarchive:true}) {
+        sendChat(this.APINAME, "/w gm " + msg, callback, settings);
     }
     
-    chatAs(characterId, msg) {
-        sendChat("character|" + characterId, msg, null, {noarchive:true});
+    chatAs(characterId, msg, callback = null, settings = {noarchive:true}) {
+        sendChat("character|" + characterId, msg, callback, settings);
     }
 
-    chatToPlayer(who, msg) {
-       sendChat(this.APINAME, "/w " + playerid + " " + msg, null, {noarchive:true});
+    chatToPlayer(who, msg, callback = null, settings = {noarchive:true}) {
+       sendChat(this.APINAME, "/w " + playerid + " " + msg, callback, settings);
     }
 
-    chatError(msg) {
-       sendChat(this.APINAME, "/w gm ERROR: " + msg, null, {noarchive:true});
+    chatError(msg, callback = null, settings = {noarchive:true}) {
+       sendChat(this.APINAME, "/w gm ERROR: " + msg, callback, settings);
     }
 
-    chatErrorToPlayer(who, msg) {
-       sendChat(this.APINAME, "/w " + who + " ERROR: " + msg, null, {noarchive:true});
+    chatErrorToPlayer(who, msg, callback = null, settings = {noarchive:true}) {
+       sendChat(this.APINAME, "/w " + who + " ERROR: " + msg, callback, settings);
     }
     
     getCleanImgsrc(imgsrc) {
@@ -39,8 +41,8 @@ class WildUtils {
 
         const toAttrName = toPrefix + fromAttrName + toSuffix;
 
-        var fromAttr = getAttrByName(fromId, fromAttrName);
-        var toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
+        let fromAttr = getAttrByName(fromId, fromAttrName);
+        let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
             if(createAttr)
             {
@@ -160,9 +162,15 @@ class WildUtils {
     // finds the folder 'name' anywhere in the journal
     findFolder(folderData, fullpath) {
         let currFolder = folderData;
+
+        fullpath = fullpath.replace('\\', '/');
         
         let paths = fullpath.split('/');
         let currPath = paths.shift();
+        if(fullpath.startsWith('/'))
+        {
+            currPath = paths.shift();
+        }
 
         while (currFolder)
         {
@@ -202,70 +210,68 @@ class WildUtils {
     }
 
 
-    getCharactersInFolder(folder) {
-        var charactersInFolder = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
+    findCharactersInFolder(folder, findInSubfolders = false) {
+        let folderData = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
         
-        if (charactersInFolder)
+        if (folderData)
         {
-            charactersInFolder = _.chain(charactersInFolder.i)
-                .filter(function(obj) { return _.isString(obj); })
-                .map(function(id) { return getObj('character', id); })
-                .reject(function(char) { return !char; })
-                .value();
+            if (findInSubfolders)
+            {
+                let charactersInFolder = [];
+                let folderStack = [];
+                let currFolder = folderData.i;
+                while (currFolder)
+                {
+                    _.each(currFolder, function(obj) {
+                        if(obj)
+                        {
+                            if(_.isString(obj))
+                            {
+                                let char = getObj('character', obj);
+                                if (char)
+                                    charactersInFolder.push(char);
+                            }
+                            else if(_.isObject(obj))
+                            {
+                                folderStack.push(obj.i);
+                            }
+                        }
+                    });                            
+
+                    currFolder = folderStack.shift();
+                }
+
+                return charactersInFolder;
+            }
+            else
+            {
+                return  _.chain(folderData.i)
+                    .filter(function(obj) { return _.isString(obj); })
+                    .map(function(id) { return getObj('character', id); })
+                    .reject(function(char) { return !char; })
+                    .value();
+            }
         }
         else
         {
             this.chatError("Cannot find folder: " + folder);
         }
 
-        return charactersInFolder;
+        return null;
     }
 
     /* UNTESTED
-    getObjectFromFolder(path, folderData, getFolder) {
-        if (path.indexOf('.') < 0) {
-            if (getFolder) {
-                return _.find(folderData, (o) => o.n && o.n.toLowerCase() === path.toLowerCase()).i;
-            }
-            return _.find(folderData, (o) => o.get && o.get('name').toLowerCase() === path.toLowerCase());
+    findInFolder(name, folder) {
+        let objectsInFolder = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
+        if (objectsInFolder)
+        {
+            return _.find(objectsInFolder, (o) => o.n && o.n.toLowerCase() === name.toLowerCase()).i;
         }
-        path = path.split('.');
-        var folder = path.shift();
-        path = path.join('.');
-        folderData = _.find(folderData, (o) => o.n && o.n.toLowerCase() === folder.toLowerCase());
-        return getObjectFromFolder(path, folderData.i);
-    }
-
-    duplicateCharacter(o) {
-        const simpleObj = (o)=>JSON.parse(JSON.stringify(o));
-
-        let c = simpleObj(o.character);
-        let oldCid = o.character.id;
-        delete c.id;
-        c.name=`(COPY) ${c.name}`;
-        c.avatar=getCleanImgsrc(c.avatar)||'';
-
-        let newC = createObj('character',c);
-        o.token.set('represents',newC.id);
-        setDefaultTokenForCharacter(newC,o.token);
-        o.token.set('represents',oldCid);
-
-        _.each(findObjs({type:'attribute',characterid:oldCid}),(a)=>{
-            let sa = simpleObj(a);
-            delete sa.id;
-            delete sa._type;
-            delete sa._characterid;
-            sa.characterid = newC.id;
-            createObj('attribute',sa);
-        });
-        _.each(findObjs({type:'ability',characterid:oldCid}),(a)=>{
-            let sa = simpleObj(a);
-            delete sa.id;
-            delete sa._type;
-            delete sa._characterid;
-            sa.characterid = newC.id;
-            createObj('ability',sa);
-        });
+        else
+        {
+            this.chatError("Cannot find folder: " + folder);
+            return null;
+        }
     }
     */
 }
@@ -292,6 +298,11 @@ class WildMenu {
         return '<span style="float: left; ' + addStyle + '">' + itemName + '</span> ';
     }
 
+    makeListLabelValue(name, value, defaultValue = '', addStyle = null)
+    {
+        return this.makeListLabel(name + ": &lt;" + (value || defaultValue) + "&gt;", addStyle);
+    }
+
     makeListButton(buttonName, href, addStyle, alt) {
         return this.makeButton(buttonName, href,  "float: right; " + addStyle, alt);
     }
@@ -307,7 +318,7 @@ class WildMenu {
 
     showMenu(who, contents, title, settings) {
         settings = settings || {};
-        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper;
+        settings.whisper = (typeof settings.whisper === 'undefined') ? '/w gm ' : '/w ' + settings.whisper + ' ';
         title = (title && title != '') ? this.makeTitle(title, settings.title_tag || '') : '';
         sendChat(who, settings.whisper + '<div style="' + this.MENU_STYLE + '">' + title + contents + '</div>', null, {noarchive:true});
     }
