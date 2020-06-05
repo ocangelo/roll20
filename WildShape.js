@@ -298,23 +298,14 @@ var WildShape = WildShape || (function() {
     let MENU = new WildShapeMenu();
     let UTILS = new WildUtils(WS_API.NAME);
 
-    const sortByKey = (unordered) => {
-        let ordered = {};
-        _.each(Object.keys(unordered).sort(function(a, b){return a.toLowerCase().localeCompare(b.toLowerCase());}), (key) => {
-            ordered[key] = unordered[key];
-        });
-
-        return ordered;
-    };
-
     const sortShifters = () => {
         // order shifters
-        state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] = sortByKey(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS]);
+        state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] = UTILS.sortByKey(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS]);
     };
 
     const sortShapes = (shifter) => {
         // order shapes
-        shifter[WS_API.FIELDS.SHAPES] = sortByKey(shifter[WS_API.FIELDS.SHAPES]);
+        shifter[WS_API.FIELDS.SHAPES] = UTILS.sortByKey(shifter[WS_API.FIELDS.SHAPES]);
     };
 
     const getCreatureSize = (targetSize) => {        

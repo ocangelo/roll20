@@ -33,6 +33,15 @@ class WildUtils {
         return;
     }    
 
+    sortByKey(unordered) {
+        let ordered = {};
+        _.each(Object.keys(unordered).sort(function(a, b){return a.toLowerCase().localeCompare(b.toLowerCase());}), (key) => {
+            ordered[key] = unordered[key];
+        });
+
+        return ordered;
+    }
+
     copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
         if(!toPrefix)
             toPrefix = "";
