@@ -1,9 +1,9 @@
 /*
 
 importing a monster from the MonsterManual:
-- open the monster and download its avatar 
+- open the monster, make a copy, and download its avatar 
 - re-add the image to the library
-- set the image from the library as the monster avatar
+- set the image from the library as the copied monster avatar
 
 */
 
