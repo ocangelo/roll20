@@ -567,7 +567,27 @@ var WildShape = WildShape || (function() {
             shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
             shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
         }
-        
+
+        // we need to turn bar visibility on if the target is controlled by a player
+        if (targetData.controlledby.length > 0)
+        {
+            if (config.TOKEN_DATA.AC !== config.TOKEN_DATA.EMPTYBAR)
+            {
+                shiftData.token.set("showplayers_" + config.TOKEN_DATA.AC, false);
+                shiftData.token.set("playersedit_" + config.TOKEN_DATA.AC, true);
+            }
+
+            if (config.TOKEN_DATA.SPEED !== config.TOKEN_DATA.EMPTYBAR)
+            {
+                shiftData.token.set("showplayers_" + config.TOKEN_DATA.SPEED, false);
+                shiftData.token.set("playersedit_" + config.TOKEN_DATA.SPEED, true);
+            }
+
+            shiftData.token.set("showplayers_" + config.TOKEN_DATA.HP, false);
+            shiftData.token.set("playersedit_" + config.TOKEN_DATA.HP, true);
+        }
+
+        // set other token data
         shiftData.token.set({
             imgsrc: targetData.imgsrc,
             represents: targetData.characterId,
