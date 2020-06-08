@@ -14,7 +14,7 @@ class WildUtils {
     }
 
     chatToPlayer(who, msg, callback = null, settings = {noarchive:true}) {
-       sendChat(this.APINAME, "/w " + playerid + " " + msg, callback, settings);
+       sendChat(this.APINAME, "/w " + who + " " + msg, callback, settings);
     }
 
     chatError(msg, callback = null, settings = {noarchive:true}) {
