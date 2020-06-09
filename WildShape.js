@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0",
+    VERSION : "1.0.2",
     STATENAME : "WILDSHAPE",
     DEBUG : false,
 
@@ -30,7 +30,18 @@ const WS_API = {
         CONFIG : {
             SEP: "--",              // separator used in commands
 
-            NPC_CURRHP: "npchp",
+            PC_DATA : {
+                HP: "hp",
+                AC: "ac",
+                SPEED: "speed",
+            },
+
+            NPC_DATA : {
+                CURRHP: "npchp",
+                HP: "hp",
+                AC: "npc_ac",
+                SPEED: "npc_speed",                
+            },
 
             TOKEN_DATA : {
                 HP: "bar1",         // HP can never be empty, we are caching current value from bars on transforming
@@ -95,6 +106,21 @@ const WS_API = {
 
         TOKEN_DATA : {
             ROOT: "tokendata",
+            HP: "HP",
+            AC: "AC",
+            SPEED: "SPEED",
+        },
+
+        NPC_DATA : {
+            ROOT: "npcdata",
+            CURRHP: "CURRHP",
+            HP: "HP",
+            AC: "AC",
+            SPEED: "SPEED",
+        },
+
+        PC_DATA : {
+            ROOT: "pcdata",
             HP: "HP",
             AC: "AC",
             SPEED: "SPEED",
@@ -240,6 +266,11 @@ class WildShapeMenu extends WildMenu
         const cmdConfigEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.CONFIG + this.SEP;
 
         const showShiftersButton = this.makeButton("Edit ShapeShifters", apiCmdBase + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
+        
+        let otherSettingsList = [
+            this.makeListLabelValue("Commands Separator", this.SEP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
+            this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+        ];
 
         let tokenDataList = [
             this.makeListLabel("<p style='font-size: 120%'><b>Token Data:</b></p>"),
@@ -253,19 +284,40 @@ class WildShapeMenu extends WildMenu
                 ], " padding-left: 10px"),
         ];
 
-        let otherSettingsList = [
-            this.makeListLabelValue("Commands Separator", this.SEP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
-            this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+        let pcDataList = [
+            this.makeListLabel("<p style='font-size: 120%'><b>PC Data:</b></p>"),
+            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+
+            this.makeList(
+                [ 
+                    this.makeListLabelValue("HP", config.PC_DATA.HP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.HP + this.SEP + "?{Attribute|" + config.PC_DATA.HP + "}"),
+                    this.makeListLabelValue("AC", config.PC_DATA.AC) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.AC + this.SEP + "?{Attribute|" + config.PC_DATA.AC + "}"),
+                    this.makeListLabelValue("SPEED", config.PC_DATA.SPEED) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.SPEED + this.SEP + "?{Attribute|" + config.PC_DATA.SPEED + "}"),
+                ], " padding-left: 10px"),
         ];
 
+        let npcDataList = [
+            this.makeListLabel("<p style='font-size: 120%'><b>NPC Data:</b></p>"),
+            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+
+            this.makeList(
+                [ 
+                    this.makeListLabelValue("Current HP", config.NPC_DATA.CURRHP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.CURRHP + this.SEP + "?{Attribute|" + config.NPC_DATA.CURRHP + "}"),
+                    this.makeListLabelValue("HP", config.NPC_DATA.HP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config.NPC_DATA.HP + "}"),
+                    this.makeListLabelValue("AC", config.NPC_DATA.AC) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config.NPC_DATA.AC + "}"),
+                    this.makeListLabelValue("SPEED", config.NPC_DATA.SPEED) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config.NPC_DATA.SPEED + "}"),
+                ], " padding-left: 10px"),
+        ];
           
         //const importButton = this.makeButton('Import Config', this.CMD.CONFIG + this.SEP + WS_API.CMD.IMPORT + this.SEP + '?{Config}', ' width: 100%');
-        const resetButton = this.makeButton('Reset Config', this.CMD.CONFIG_RESET, ' width: 100%');
+        const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET, ' width: 100%');
 
         let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((first) ? ': First Time Setup' : ': Config');
         let contents = showShiftersButton
-                        + '<hr>' + this.makeList(tokenDataList)
                         + '<hr>' + this.makeList(otherSettingsList)
+                        + '<hr>' + this.makeList(tokenDataList)
+                        + '<hr>' + this.makeList(pcDataList)
+                        + '<hr>' + this.makeList(npcDataList)
                         + '<hr>' + resetButton;
 
         this.showMenu(WS_API.NAME, contents, title_text);
@@ -347,6 +399,7 @@ var WildShape = WildShape || (function() {
 
     const getCharacterData = (shiftData, isNpc, isDefault) =>
     {
+        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
 
         let data = {};
@@ -354,15 +407,17 @@ var WildShape = WildShape || (function() {
         let targetImg = null;
         let targetSize = 1;
 
-        let hpName = "hp";
+        let hpName;
         let acName;
         let speedName;
         
         if(isNpc)
         {
-            acName = "npc_ac";    
-            speedName = "npc_speed";
+            hpName      = config.NPC_DATA.HP;
+            acName      = config.NPC_DATA.AC;    
+            speedName   = config.NPC_DATA.SPEED;
 
+            // get token image
             targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
             if (targetImg === undefined)
             {
@@ -370,6 +425,7 @@ var WildShape = WildShape || (function() {
                 return null;
             }
             
+            // get token size
             const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
             targetSize =  getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
             if (targetSize === 0)
@@ -381,14 +437,17 @@ var WildShape = WildShape || (function() {
         }
         else
         {
-            acName = "ac";    
-            speedName = "speed";
+            hpName      = config.PC_DATA.HP;
+            acName      = config.PC_DATA.AC;
+            speedName   = config.PC_DATA.SPEED;
 
+            // get token image
             shiftData.targetCharacter.get('_defaulttoken', function(defaulttoken) {
                 const dt = JSON.parse(defaulttoken);
                 if (dt)
                     targetImg = UTILS.getCleanImgsrc(dt.imgsrc);
             });
+
             if (!targetImg)
             {
                 targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
@@ -400,6 +459,7 @@ var WildShape = WildShape || (function() {
                 }
             }
 
+            // get token size
             targetSize = getCreatureSize(shifterSettings[WS_API.FIELDS.SIZE]);
             
             // auto defaults to normal on PCs
@@ -411,20 +471,44 @@ var WildShape = WildShape || (function() {
         let acObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: acName})[0];
         let speedObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: speedName})[0];
         
-        data.hp             = {};
-        data.hp.current     = hpObj.get('current');
-        data.hp.max         = hpObj.get('max');
-        data.hp.id          = hpObj.id;
+        if(hpObj)
+        {
+            data.hp             = {};
+            data.hp.current     = hpObj.get('current');
+            data.hp.max         = hpObj.get('max');
+            data.hp.id          = hpObj.id;
+        }
+        else
+        {
+            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + hpName + "] on character: " + shiftData.targetCharacterId);
+            return null;
+        }
 
-        data.ac             = {};
-        data.ac.current     = acObj.get('current');
-        data.ac.max         = acObj.get('max');
-        data.ac.id          = acObj.id;
+        if (acObj)
+        {
+            data.ac             = {};
+            data.ac.current     = acObj.get('current');
+            data.ac.max         = acObj.get('max');
+            data.ac.id          = acObj.id;
+        }
+        else
+        {
+            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + acName + "] on character: " + shiftData.targetCharacterId);
+            return null;
+        }
 
-        data.speed          = {};
-        data.speed.current  = speedObj.get('current');
-        data.speed.max      = speedObj.get('max');
-        data.speed.id       = speedObj.id;
+        if (speedObj)
+        {
+            data.speed          = {};
+            data.speed.current  = speedObj.get('current');
+            data.speed.max      = speedObj.get('max');
+            data.speed.id       = speedObj.id;
+        }
+        else
+        {
+            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + speedName + "] on character: " + shiftData.targetCharacterId);
+            return null;
+        }
 
         data.imgsrc = targetImg;
 	    data.characterId = shiftData.targetCharacterId;
@@ -434,13 +518,11 @@ var WildShape = WildShape || (function() {
         // special handling of NPC ShapeShifter to restore hp when going back to original form, as they don't store the current in hp
         if(shifterSettings[WS_API.FIELDS.ISNPC])
         {
-            const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
-
             if (isDefault)
             {
                 if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
                 {
-                    data.hp.current = shifterSettings[config.NPC_CURRHP];
+                    data.hp.current = shifterSettings[config.NPC_DATA.CURRHP];
                 }
                 else
                     return null;
@@ -448,7 +530,7 @@ var WildShape = WildShape || (function() {
             else if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.DEFAULTS.BASE_SHAPE)
             {
                 // cache current npc hp value
-                shifterSettings[config.NPC_CURRHP] = shiftData.token.get(config.TOKEN_DATA.HP + "_value");
+                shifterSettings[config.NPC_DATA.CURRHP] = shiftData.token.get(config.TOKEN_DATA.HP + "_value");
             }                
         }
 
@@ -516,9 +598,9 @@ var WildShape = WildShape || (function() {
             UTILS.chat("token_size = " + targetData.tokenSize);
             UTILS.chat("controlledby = " + targetData.controlledby);
             UTILS.chat("avatar = " + targetData.imgsrc);
-            UTILS.chat("hp = " + targetData.hp.current);
-            UTILS.chat("ac = " + targetData.ac.current);
-            UTILS.chat("npc speed = " + targetData.speed.current);
+            UTILS.chat("hp = " + (targetData.hp ? targetData.hp.current : "invalid"));
+            UTILS.chat("ac = " + (targetData.ac ? targetData.ac.current : "invalid"));
+            UTILS.chat("npc speed = " + (targetData.speed ? targetData.speed.current : "invalid"));
         }
 
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
@@ -530,41 +612,47 @@ var WildShape = WildShape || (function() {
                 copyDruidData(shifterSettings[WS_API.FIELDS.ID], shiftData.targetCharacterId);
             }
 
-            if (config.TOKEN_DATA.AC != config.TOKEN_DATA.EMPTYBAR)
+            if (targetData.ac && config.TOKEN_DATA.AC != config.TOKEN_DATA.EMPTYBAR)
             {
                 shiftData.token.set(config.TOKEN_DATA.AC + "_link", 'None');
                 shiftData.token.set(config.TOKEN_DATA.AC + "_value", targetData.ac.current);
             }
 
-            if (config.TOKEN_DATA.SPEED != config.TOKEN_DATA.EMPTYBAR)
+            if (targetData.speed && config.TOKEN_DATA.SPEED != config.TOKEN_DATA.EMPTYBAR)
             {
                 shiftData.token.set(config.TOKEN_DATA.SPEED + "_link", 'None');
                 shiftData.token.set(config.TOKEN_DATA.SPEED + "_value", targetData.speed.current.split(' ')[0]);
             }
 
             // set HP last in case we need to override another value because of wrong data
-            shiftData.token.set(config.TOKEN_DATA.HP + "_link", 'None');
-            shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
-            shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
+            if (targetData.hp)
+            {
+                shiftData.token.set(config.TOKEN_DATA.HP + "_link", 'None');
+                shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
+                shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
+            }
         }
         else
         {
-            if (config.TOKEN_DATA.AC != config.TOKEN_DATA.EMPTYBAR)
+            if (targetData.ac && config.TOKEN_DATA.AC != config.TOKEN_DATA.EMPTYBAR)
             {
                 shiftData.token.set(config.TOKEN_DATA.AC + "_link", isTargetDefault ? targetData.ac.id : 'None');
                 shiftData.token.set(config.TOKEN_DATA.AC + "_value", targetData.ac.current);
             }
 
-            if (config.TOKEN_DATA.SPEED != config.TOKEN_DATA.EMPTYBAR)
+            if (targetData.speed && config.TOKEN_DATA.SPEED != config.TOKEN_DATA.EMPTYBAR)
             {
                 shiftData.token.set(config.TOKEN_DATA.SPEED + "_link", targetData.speed.id);
                 shiftData.token.set(config.TOKEN_DATA.SPEED + "_value", targetData.speed.current);
             }
 
             // set HP last in case we need to override another value because of wrong data
-            shiftData.token.set(config.TOKEN_DATA.HP + "_link", isTargetDefault ? targetData.hp.id : 'None');
-            shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
-            shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
+            if (targetData.hp)
+            {
+                shiftData.token.set(config.TOKEN_DATA.HP + "_link", isTargetDefault ? targetData.hp.id : 'None');
+                shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
+                shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
+            }
         }
 
         // we need to turn bar visibility on if the target is controlled by a player
@@ -1110,6 +1198,21 @@ var WildShape = WildShape || (function() {
                                                         config.TOKEN_DATA[field] = args.shift();
                                                     }
                                                     break;
+
+                                                    case WS_API.FIELDS.PC_DATA.ROOT:
+                                                    {
+                                                        const field = args.shift();
+                                                        config.PC_DATA[field] = args.shift();
+                                                    }
+                                                    break;
+
+                                                    case WS_API.FIELDS.NPC_DATA.ROOT:
+                                                    {
+                                                        const field = args.shift();
+                                                        config.NPC_DATA[field] = args.shift();
+                                                    }
+                                                    break;
+
                                                 }
 
                                                 MENU.updateConfig();
@@ -1252,6 +1355,29 @@ var WildShape = WildShape || (function() {
         }
     };
 
+    const upgradeVersion = () => {
+        const currentVersion = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
+        const newConfig = WS_API.DEFAULTS.CONFIG;
+        let config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+
+        if (UTILS.isNewerVersion(currentVersion, "1.0.2"))
+        {
+            UTILS.chat("upgrading config to 1.0.2");
+            config.NPC_DATA = {};
+            config.NPC_DATA.CURRHP   = newConfig.NPC_DATA.CURRHP;
+            config.NPC_DATA.HP       = newConfig.NPC_DATA.HP;
+            config.NPC_DATA.AC       = newConfig.NPC_DATA.AC;
+            config.NPC_DATA.SPEED    = newConfig.NPC_DATA.SPEED;
+
+            config.PC_DATA = {};
+            config.PC_DATA.HP        = newConfig.PC_DATA.HP;
+            config.PC_DATA.AC        = newConfig.PC_DATA.AC;
+            config.PC_DATA.SPEED     = newConfig.PC_DATA.SPEED;
+        }
+
+        config.VERSION = WS_API.VERSION;
+    };
+
     const setDefaults = (reset) => {
         let newVersionDetected = false;
 
@@ -1268,9 +1394,14 @@ var WildShape = WildShape || (function() {
         }        
         else 
         {
-            // TO DO: implement versioning
-            newVersionDetected = true;
-            state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
+            newVersionDetected = UTILS.isNewerVersion(state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION, WS_API.VERSION);
+
+            if (newVersionDetected)
+            {
+
+                UTILS.chat("new version detected, upgrading from " + state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION);
+                upgradeVersion();
+            }
         }
 
         if (!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] || typeof state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] !== 'object' || reset)
@@ -1282,7 +1413,9 @@ var WildShape = WildShape || (function() {
 
         if (!state[WS_API.STATENAME].hasOwnProperty('firsttime') || reset || newVersionDetected)
         {
+
             MENU.showConfigMenu(true);
+
             state[WS_API.STATENAME].firsttime = false;
         }
     };

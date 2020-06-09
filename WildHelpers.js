@@ -25,6 +25,32 @@ class WildUtils {
        sendChat(this.APINAME, "/w " + who + " ERROR: " + msg, callback, settings);
     }
     
+    isNewerVersion(oldVersion, newVersion)
+    {
+
+        if (typeof oldVersion!=='object') { oldVersion = oldVersion.toString().split('.'); }
+        if (typeof newVersion!=='object') { newVersion = newVersion.toString().split('.'); }
+
+        const maxLen = Math.max(oldVersion.length,newVersion.length);
+        for(let i=0; i< maxLen; i++)
+        {
+            if (oldVersion[i]==undefined) { oldVersion[i]=0; }
+            if (newVersion[i]==undefined) { newVersion[i]=0; }
+
+            if (Number(oldVersion[i]) < Number(newVersion[i]))
+            {
+                return true;
+            }
+
+            if (oldVersion[i] != newVersion[i])
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
     getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
         if(parts) {
@@ -290,7 +316,7 @@ class WildMenu {
     {
         this.MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px; ";
         this.BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; ";
-        this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 20px; overflow:hidden; ";
+        this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 10px; overflow:hidden; ";
         this.ITEM_STYLE = "overflow:hidden;";
     }
 
