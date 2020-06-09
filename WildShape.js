@@ -106,10 +106,6 @@ class WildShapeMenu extends WildMenu
 {
     constructor() {
         super();
-        this.UTILS = new WildUtils(WS_API.NAME);
-        this.SHAPE_SIZES = WS_API.SHAPE_SIZES.join("|");
-
-        this.updateConfig();
     }
 
     updateConfig()
@@ -122,6 +118,9 @@ class WildShapeMenu extends WildMenu
         this.CMD.CONFIG_REMOVE   = this.CMD.CONFIG + this.SEP + WS_API.CMD.REMOVE + this.SEP;
         this.CMD.CONFIG_EDIT     = this.CMD.CONFIG + this.SEP + WS_API.CMD.EDIT + this.SEP;
         this.CMD.CONFIG_RESET    = this.CMD.CONFIG + this.SEP + WS_API.CMD.RESET;
+
+        this.UTILS = new WildUtils(WS_API.NAME);
+        this.SHAPE_SIZES = WS_API.SHAPE_SIZES.join("|");
     }
 
     showEditShape(shifterId, shapeId) {
@@ -1256,7 +1255,7 @@ var WildShape = WildShape || (function() {
     const setDefaults = (reset) => {
         let newVersionDetected = false;
 
-        if (!state[WS_API.STATENAME])
+        if(!_.has(state, WS_API.STATENAME) || !state[WS_API.STATENAME] || reset)
         {
             state[WS_API.STATENAME] = {};
             reset = true;
@@ -1270,15 +1269,16 @@ var WildShape = WildShape || (function() {
         else 
         {
             // TO DO: implement versioning
-
+            newVersionDetected = true;
             state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
-            MENU.updateConfig();
         }
 
         if (!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] || typeof state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] !== 'object' || reset)
         {
             state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] = {};
         }
+
+        MENU.updateConfig();
 
         if (!state[WS_API.STATENAME].hasOwnProperty('firsttime') || reset || newVersionDetected)
         {
@@ -1289,10 +1289,6 @@ var WildShape = WildShape || (function() {
 
     const start = () => {
         // check install
-        if(!_.has(state, WS_API.STATENAME)) 
-        {
-            state[WS_API.STATENAME] = state[WS_API.STATENAME] || {};
-        }
         setDefaults();
 
         // register event handlers
