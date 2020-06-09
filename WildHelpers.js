@@ -25,30 +25,33 @@ class WildUtils {
        sendChat(this.APINAME, "/w " + who + " ERROR: " + msg, callback, settings);
     }
     
-    isNewerVersion(oldVersion, newVersion)
+    // returns:
+    // 1: versionA > versionB
+    // 0: versionA == versionB
+    // -1: versionA < versionB
+    compareVersion(versionA, versionB)
     {
 
-        if (typeof oldVersion!=='object') { oldVersion = oldVersion.toString().split('.'); }
-        if (typeof newVersion!=='object') { newVersion = newVersion.toString().split('.'); }
+        if (typeof versionA !== 'object') { versionA = versionA.toString().split('.'); }
+        if (typeof versionB !== 'object') { versionB = versionB.toString().split('.'); }
 
-        const maxLen = Math.max(oldVersion.length,newVersion.length);
-        for(let i=0; i< maxLen; i++)
+        const maxLen = Math.max(versionA.length,versionB.length);
+        for (let i=0; i< maxLen; i++)
         {
-            if (oldVersion[i]==undefined) { oldVersion[i]=0; }
-            if (newVersion[i]==undefined) { newVersion[i]=0; }
+            if (versionA[i] == undefined) { versionA[i]=0; }
+            if (versionB[i] == undefined) { versionB[i]=0; }
 
-            if (Number(oldVersion[i]) < Number(newVersion[i]))
+            if (Number(versionA[i]) > Number(versionB[i]))
             {
-                return true;
+                return 1;
             }
-
-            if (oldVersion[i] != newVersion[i])
+            else if (Number(versionA[i]) < Number(versionB[i]))
             {
-                break;
+                return -1;
             }
         }
 
-        return false;
+        return 0;
     }
 
     getCleanImgsrc(imgsrc) {

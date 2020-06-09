@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.2",
+    VERSION : "1.0.3",
     STATENAME : "WILDSHAPE",
     DEBUG : false,
 
@@ -37,7 +37,7 @@ const WS_API = {
             },
 
             NPC_DATA : {
-                CURRHP: "npchp",
+                HP_CACHE: "npcCachedHp",
                 HP: "hp",
                 AC: "npc_ac",
                 SPEED: "npc_speed",                
@@ -113,7 +113,6 @@ const WS_API = {
 
         NPC_DATA : {
             ROOT: "npcdata",
-            CURRHP: "CURRHP",
             HP: "HP",
             AC: "AC",
             SPEED: "SPEED",
@@ -302,7 +301,6 @@ class WildShapeMenu extends WildMenu
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("Current HP", config.NPC_DATA.CURRHP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.CURRHP + this.SEP + "?{Attribute|" + config.NPC_DATA.CURRHP + "}"),
                     this.makeListLabelValue("HP", config.NPC_DATA.HP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config.NPC_DATA.HP + "}"),
                     this.makeListLabelValue("AC", config.NPC_DATA.AC) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config.NPC_DATA.AC + "}"),
                     this.makeListLabelValue("SPEED", config.NPC_DATA.SPEED) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config.NPC_DATA.SPEED + "}"),
@@ -522,7 +520,7 @@ var WildShape = WildShape || (function() {
             {
                 if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
                 {
-                    data.hp.current = shifterSettings[config.NPC_DATA.CURRHP];
+                    data.hp.current = shifterSettings[config.NPC_DATA.HP_CACHE];
                 }
                 else
                     return null;
@@ -530,8 +528,8 @@ var WildShape = WildShape || (function() {
             else if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.DEFAULTS.BASE_SHAPE)
             {
                 // cache current npc hp value
-                shifterSettings[config.NPC_DATA.CURRHP] = shiftData.token.get(config.TOKEN_DATA.HP + "_value");
-            }                
+                shifterSettings[config.NPC_DATA.HP_CACHE] = shiftData.token.get(config.TOKEN_DATA.HP + "_value");
+            }
         }
 
         return data;
@@ -1360,11 +1358,11 @@ var WildShape = WildShape || (function() {
         const newConfig = WS_API.DEFAULTS.CONFIG;
         let config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
 
-        if (UTILS.isNewerVersion(currentVersion, "1.0.2"))
+        if (UTILS.compareVersion(currentVersion, "1.0.2") < 0)
         {
             UTILS.chat("upgrading config to 1.0.2");
             config.NPC_DATA = {};
-            config.NPC_DATA.CURRHP   = newConfig.NPC_DATA.CURRHP;
+            config.NPC_DATA.HP_CACHE = newConfig.NPC_DATA.HP_CACHE;
             config.NPC_DATA.HP       = newConfig.NPC_DATA.HP;
             config.NPC_DATA.AC       = newConfig.NPC_DATA.AC;
             config.NPC_DATA.SPEED    = newConfig.NPC_DATA.SPEED;
@@ -1394,12 +1392,12 @@ var WildShape = WildShape || (function() {
         }        
         else 
         {
-            newVersionDetected = UTILS.isNewerVersion(state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION, WS_API.VERSION);
+            newVersionDetected = UTILS.compareVersion(state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION, WS_API.VERSION) < 0 ? true : false;
 
             if (newVersionDetected)
             {
 
-                UTILS.chat("new version detected, upgrading from " + state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION);
+                UTILS.chat("new version detected, upgrading from " + state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION + " to " + WS_API.VERSION);
                 upgradeVersion();
             }
         }
