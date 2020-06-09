@@ -258,7 +258,7 @@ class WildShapeMenu extends WildMenu
         this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ShapeShifters');
     }
 
-    showConfigMenu(first) {
+    showConfigMenu(newVersion) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
 
         const apiCmdBase = this.CMD.ROOT;
@@ -310,7 +310,7 @@ class WildShapeMenu extends WildMenu
         //const importButton = this.makeButton('Import Config', this.CMD.CONFIG + this.SEP + WS_API.CMD.IMPORT + this.SEP + '?{Config}', ' width: 100%');
         const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET, ' width: 100%');
 
-        let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((first) ? ': First Time Setup' : ': Config');
+        let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((newVersion) ? ': New Version Setup' : ': Config');
         let contents = showShiftersButton
                         + '<hr>' + this.makeList(otherSettingsList)
                         + '<hr>' + this.makeList(tokenDataList)
@@ -1379,16 +1379,17 @@ var WildShape = WildShape || (function() {
     const setDefaults = (reset) => {
         let newVersionDetected = false;
 
-        if(!_.has(state, WS_API.STATENAME) || !state[WS_API.STATENAME] || reset)
+        if(!state[WS_API.STATENAME] || typeof state[WS_API.STATENAME] !== 'object' || reset)
         {
             state[WS_API.STATENAME] = {};
             reset = true;
         }
 
-        if (!state[WS_API.STATENAME][WS_API.DATA_CONFIG] || reset) 
+        if (!state[WS_API.STATENAME][WS_API.DATA_CONFIG] || typeof state[WS_API.STATENAME][WS_API.DATA_CONFIG] !== 'object' || reset) 
         {
             state[WS_API.STATENAME][WS_API.DATA_CONFIG] = WS_API.DEFAULTS.CONFIG;
             state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
+            newVersionDetected = true;
         }        
         else 
         {
@@ -1409,12 +1410,9 @@ var WildShape = WildShape || (function() {
 
         MENU.updateConfig();
 
-        if (!state[WS_API.STATENAME].hasOwnProperty('firsttime') || reset || newVersionDetected)
+        if (reset || newVersionDetected)
         {
-
             MENU.showConfigMenu(true);
-
-            state[WS_API.STATENAME].firsttime = false;
         }
     };
 
