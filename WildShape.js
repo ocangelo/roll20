@@ -1256,6 +1256,12 @@ var WildShape = WildShape || (function() {
     const setDefaults = (reset) => {
         let newVersionDetected = false;
 
+        if (!state[WS_API.STATENAME])
+        {
+            state[WS_API.STATENAME] = {};
+            reset = true;
+        }
+
         if (!state[WS_API.STATENAME][WS_API.DATA_CONFIG] || reset) 
         {
             state[WS_API.STATENAME][WS_API.DATA_CONFIG] = WS_API.DEFAULTS.CONFIG;
