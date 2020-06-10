@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.3",
+    VERSION : "1.0.4",
     STATENAME : "WILDSHAPE",
     DEBUG : false,
 
@@ -25,7 +25,6 @@ const WS_API = {
         BASE_SHAPE : "base",
         SHIFTER_SIZE : "normal",
         SHAPE_SIZE : "auto",
-        ISDRUID : true,
 
         CONFIG : {
             SEP: "--",              // separator used in commands
@@ -99,6 +98,7 @@ const WS_API = {
         CHARACTER: "character",
         SIZE: "size",
         ISDRUID: "isdruid",
+        MAKEROLLPUBLIC: "makerollpublic",
         ISNPC: "isnpc",
         CURRENT_SHAPE: "currshape",
 
@@ -208,6 +208,8 @@ class WildShapeMenu extends WildMenu
             listSettings.push(this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"));
             listSettings.push(this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.ISDRUID));
             listSettings.push(this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"));
+            listSettings.push(this.makeListLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeListButton("Toggle", cmdShifterEdit + shifterId + this.SEP + WS_API.FIELDS.MAKEROLLPUBLIC));
+            listSettings.push(this.makeListLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"));
         }
         listItems.push(this.makeList(listSettings, " padding-left: 10px"));
 
@@ -632,6 +634,7 @@ var WildShape = WildShape || (function() {
 
         if (isTargetNpc)
         {
+            // copy over druid attributes
             if (shifterSettings[WS_API.FIELDS.ISDRUID])
             {
                 copyDruidData(shifterSettings[WS_API.FIELDS.ID], shiftData.targetCharacterId);
@@ -678,6 +681,30 @@ var WildShape = WildShape || (function() {
                 shiftData.token.set(config.TOKEN_DATA.HP + "_value", isTargetDefault ? targetData.hp.current : targetData.hp.max);
                 shiftData.token.set(config.TOKEN_DATA.HP + "_max", targetData.hp.max);
             }
+        }
+
+        // override default rolltype, whisper and autoroll damage settings to: toggle, visible to everyone and don't auto roll damage
+        if (shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC])
+        {
+            let targetAttr = findObjs({_type: "attribute", name: "rtype", _characterid: shiftData.targetCharacterId})[0];
+            if (targetAttr)
+            {
+                targetAttr.set('current', "@{advantagetoggle}");
+ 
+                targetAttr = findObjs({_type: "attribute", name: "advantagetoggle", _characterid: shiftData.targetCharacterId})[0];
+                if (targetAttr)
+                    targetAttr.set('current', "{{query=1}} {{normal=1}} {{r2=[[0d20");
+            }
+
+            targetAttr = findObjs({_type: "attribute", name: "wtype", _characterid: shiftData.targetCharacterId})[0];
+            if (targetAttr) 
+                targetAttr.set('current', "");
+
+/* this currently doesn't work
+            targetAttr = findObjs({_type: "attribute", name: "dtype", _characterid: shiftData.targetCharacterId})[0];
+            if (targetAttr)
+                targetAttr.set('current', "pick");
+*/
         }
 
         // we need to turn bar visibility on if the target is controlled by a player
@@ -893,6 +920,7 @@ var WildShape = WildShape || (function() {
                                                             shifterSettings[WS_API.FIELDS.SIZE] = isNpc ? WS_API.DEFAULTS.SHAPE_SIZE : WS_API.DEFAULTS.SHIFTER_SIZE;
                                                             shifterSettings[WS_API.FIELDS.ISDRUID] = !isNpc;
                                                             shifterSettings[WS_API.FIELDS.ISNPC] = isNpc;
+                                                            shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC] = !isNpc;
                                                             shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = WS_API.DEFAULTS.BASE_SHAPE;
 
                                                             shifter[WS_API.FIELDS.SETTINGS] = shifterSettings;
@@ -1092,6 +1120,11 @@ var WildShape = WildShape || (function() {
                                                         else if(field == WS_API.FIELDS.ISDRUID)
                                                         {
                                                             shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID];
+                                                            isValueSet = true;
+                                                        }
+                                                        else if(field == WS_API.FIELDS.MAKEROLLPUBLIC)
+                                                        {
+                                                            shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC];
                                                             isValueSet = true;
                                                         }
                                                         else
@@ -1389,7 +1422,9 @@ var WildShape = WildShape || (function() {
     const upgradeVersion = () => {
         const currentVersion = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
         const newConfig = WS_API.DEFAULTS.CONFIG;
+
         let config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+        let shifters = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS];
 
         if (UTILS.compareVersion(currentVersion, "1.0.2") < 0)
         {
@@ -1404,6 +1439,15 @@ var WildShape = WildShape || (function() {
             config.PC_DATA.HP        = newConfig.PC_DATA.HP;
             config.PC_DATA.AC        = newConfig.PC_DATA.AC;
             config.PC_DATA.SPEED     = newConfig.PC_DATA.SPEED;
+        }
+
+        if (UTILS.compareVersion(currentVersion, "1.0.4") < 0)
+        {
+            // add MAKEROLLPUBLIC field to shifters, default to true for non-npcs
+            _.each(shifters, (value, shifterId) => {
+                let shifterSettings = shifters[shifterId][WS_API.FIELDS.SETTINGS];
+                shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC] = !shifterSettings[WS_API.FIELDS.ISNPC];
+            });
         }
 
         config.VERSION = WS_API.VERSION;
