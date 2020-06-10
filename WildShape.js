@@ -395,14 +395,35 @@ var WildShape = WildShape || (function() {
         return null;
     };
 
-    const getCharacterData = (shiftData, isNpc, isDefault) =>
-    {
+    async function getDefaultTokenImage(character) {
+        let img = null;
+
+        // get token image
+        character.get('defaulttoken', function(defaulttoken) {
+            const dt = JSON.parse(defaulttoken);
+            if (dt)
+            {
+                img = UTILS.getCleanImgsrc(dt.imgsrc);
+            }
+            else
+                img = "";
+        });
+
+        while (img == null)
+        {
+            await UTILS.sleep(50);
+        }
+
+        return img;
+    }
+
+    async function getCharacterData(shiftData, isNpc, isDefault) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
 
         let data = {};
         
-        let targetImg = null;
+        let targetImg = "";
         let targetSize = 1;
 
         let hpName;
@@ -412,12 +433,12 @@ var WildShape = WildShape || (function() {
         if(isNpc)
         {
             hpName      = config.NPC_DATA.HP;
-            acName      = config.NPC_DATA.AC;    
+            acName      = config.NPC_DATA.AC;
             speedName   = config.NPC_DATA.SPEED;
 
             // get token image
             targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
-            if (targetImg === undefined)
+            if (targetImg == "")
             {
                 UTILS.chatErrorToPlayer(shiftData.who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
                 return null;
@@ -439,23 +460,21 @@ var WildShape = WildShape || (function() {
             acName      = config.PC_DATA.AC;
             speedName   = config.PC_DATA.SPEED;
 
-            // get token image
-            shiftData.targetCharacter.get('_defaulttoken', function(defaulttoken) {
-                const dt = JSON.parse(defaulttoken);
-                if (dt)
-                    targetImg = UTILS.getCleanImgsrc(dt.imgsrc);
-            });
+            // the get on _defaulttoken is async, need to wait on it
+            await getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
+                targetImg = img;
 
-            if (!targetImg)
-            {
-                targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
-
-                if (!targetImg)
+                if (targetImg == "")
                 {
-                    UTILS.chatErrorToPlayer(shiftData.who, "cannot find token or avatar image for PC " + shiftData.targetCharacterId);
-                    return null;
+                    targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
+
+                    if (targetImg == "")
+                    {
+                        UTILS.chatErrorToPlayer(shiftData.who, "cannot find token or avatar image for PC " + shiftData.targetCharacterId);
+                        return null;
+                    }
                 }
-            }
+            });
 
             // get token size
             targetSize = getCreatureSize(shifterSettings[WS_API.FIELDS.SIZE]);
@@ -508,6 +527,12 @@ var WildShape = WildShape || (function() {
             return null;
         }
 
+        if (targetImg == "")
+        {
+            UTILS.chatError("cannot find target image");
+            return null;
+        }
+
         data.imgsrc = targetImg;
 	    data.characterId = shiftData.targetCharacterId;
         data.controlledby = shiftData.shifterControlledby;
@@ -533,7 +558,7 @@ var WildShape = WildShape || (function() {
         }
 
         return data;
-    };
+    }
 
     const copyDruidData = (fromId, toId) => {
         const copyAttrNames = ["intelligence", "wisdom", "charisma"];
@@ -560,7 +585,7 @@ var WildShape = WildShape || (function() {
         */
     };
 
-    const doShapeShift = (shiftData) => {
+    async function doShapeShift(shiftData) {
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
 
         let isTargetNpc = true;
@@ -586,7 +611,9 @@ var WildShape = WildShape || (function() {
             isTargetNpc = shifterSettings[WS_API.FIELDS.ISNPC];
             isTargetDefault = true;
         }
-        const targetData = getCharacterData(shiftData, isTargetNpc, isTargetDefault);
+
+        let targetData = null;
+        await getCharacterData(shiftData, isTargetNpc, isTargetDefault).then((ret) => { targetData = ret; });
         if (!targetData)
             return false;
 
@@ -688,7 +715,7 @@ var WildShape = WildShape || (function() {
         shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = shiftData.targetShapeName;
         
         return true;
-    };
+    }
 
     const addShapeToShifter = (shifter, shapeCharacter, shapeId = null, doSort = true) => {
         const shapeName = shapeCharacter.get('name');
@@ -791,10 +818,12 @@ var WildShape = WildShape || (function() {
                                         if (shape)
                                         {
                                             obj.targetShape = shape;
-                                            if (doShapeShift(obj))
-                                            {
-                                                UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
-                                            }
+                                            doShapeShift(obj).then((ret) => {
+                                                if (ret)
+                                                {
+                                                    UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
+                                                }
+                                            });
                                         }
                                         else
                                         {
@@ -808,8 +837,12 @@ var WildShape = WildShape || (function() {
                                 }
                                 else
                                 {
-                                    if (doShapeShift(obj))
-                                        UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterId, null, null);
+                                    doShapeShift(obj).then((ret) => {
+                                        if (ret)
+                                        {
+                                            UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming back into " + obj.shifterId, null, null);
+                                        }
+                                    });
                                 }   
                             }
                             else

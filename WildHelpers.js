@@ -59,8 +59,12 @@ class WildUtils {
         if(parts) {
             return parts[1]+'thumb'+parts[3]+(parts[4]?parts[4]:`?${Math.round(Math.random()*9999999)}`);
         }
-        return;
-    }    
+        return "";
+    } 
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     sortByKey(unordered) {
         let ordered = {};
