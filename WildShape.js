@@ -608,8 +608,8 @@ var WildShape = WildShape || (function() {
         else
         {
             // transform back into default shifter character
-            shiftData.targetCharacterId = shifterSettings[WS_API.FIELDS.ID];
-            shiftData.targetCharacter = shiftData.shifterCharacter;  
+            shiftData.targetCharacterId = shiftData.shifterCharacterId;
+            shiftData.targetCharacter = shiftData.shifterCharacter;
             isTargetNpc = shifterSettings[WS_API.FIELDS.ISNPC];
             isTargetDefault = true;
         }
@@ -726,12 +726,22 @@ var WildShape = WildShape || (function() {
             shiftData.token.set("playersedit_" + config.TOKEN_DATA.HP, true);
         }
 
+        // check if the token is on a scaled page
+        let tokenPageScale = 1.0;
+        var tokenPageData = getObj("page", shiftData.token.get("pageid"));
+        if (tokenPageData)
+        {
+            tokenPageScale = tokenPageData.get("snapping_increment");
+        }
+
+        let tokenBaseSize = 70 * tokenPageScale;
+
         // set other token data
         shiftData.token.set({
             imgsrc: targetData.imgsrc,
             represents: targetData.characterId,
-            height: 70 * targetData.tokenSize,
-            width: 70 * targetData.tokenSize,
+            height: tokenBaseSize * targetData.tokenSize,
+            width: tokenBaseSize * targetData.tokenSize,
         });
 
         if (!isTargetDefault)
