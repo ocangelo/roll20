@@ -51,15 +51,16 @@ const WS_API = {
                 EMPTYBAR: "none",
             },
 
-            OVERRIDE_SENSES: true,
             SENSES: {
+                OVERRIDE_SENSES: true,
+
                 light_radius: 5,
                 light_dimradius: -5,
                 light_otherplayers: false,
+                light_hassight: true,
                 light_angle: 360,
                 light_losangle: 360,
                 light_multiplier: 1, 
-                light_hassight: true,
             },
         },
     },
@@ -95,6 +96,7 @@ const WS_API = {
     // fields that can be changed by commands
     FIELDS : {
         SEP: "sep",
+        TOGGLE: "toggle",
 
         // target of a command
         TARGET : {
@@ -140,21 +142,20 @@ const WS_API = {
         SENSES: {
             ROOT: "SENSES",
             OVERRIDE: "OVERRIDE_SENSES",
-            SETTINGS: "SETTINGS",
 
             LIGHT_ATTRS: [
                 "light_radius",
                 "light_dimradius",
                 "light_otherplayers",
+                "light_hassight",
                 "light_angle",
                 "light_losangle",
-                "light_multiplier", 
-                "light_hassight"],
+                "light_multiplier"],
         },        
     },
 
     CHANGELOG : {
-        "1.0.6" : "added senses settings (e.g. vision, light)",
+        "1.0.6" : "added automatic senses setup for NPCs (e.g. vision, light) and senses overrides for shifters and single shapes",
         "1.0.5" : "changed default separator to minimize collisions",
         "1.0.4" : "added override roll settings (default true on PCs) to automatically set target shapes to never whisper, toggle advantage",
         "1.0.2" : "restructured pc/npc data",
@@ -182,46 +183,77 @@ class WildShapeMenu extends WildMenu
         this.SHAPE_SIZES = WS_API.SHAPE_SIZES.join("|");
     }
 
-    showEditSenses(menuTitle, shifterId = null, shapeId = null) {
+    showEditSenses(shifterId = null, shapeId = null) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         let settings;
         let cmdEdit;
+        let cmdBack;
+        let cmdBackName;
+        let overrideName;
+        let menuTitle;
 
+        // check what are editing senses on
         if (shifterId)
         {
+            menuTitle = WS_API.NAME + ": " + shifterId;
             const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId];
+
             if (shapeId)
             {
                 settings = shifter[WS_API.FIELDS.SHAPES][shapeId];
                 cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId + this.SEP;
+                cmdBack = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId;
+                cmdBackName = "Edit Shape: " + shapeId;
+                menuTitle = menuTitle + " - " + shapeId;
             }
             else
             {
-                cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId + this.SEP;
                 settings = shifter[WS_API.FIELDS.SETTINGS];
+                cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId + this.SEP;
+                cmdBack = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId;
+                cmdBackName = "Edit Shifter: " + shifterId;
             }
+
+            menuTitle = menuTitle + " - Senses";
+            overrideName = "Force Senses";
         }
         else
         {
             settings = config;
             cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.CONFIG + this.SEP;
+            cmdBack = this.CMD.CONFIG;
+            cmdBackName = "Main Menu";
+            menuTitle = "Default Senses";
+
+            overrideName = "Write Senses";
         }
 
+        cmdEdit = cmdEdit + WS_API.FIELDS.SENSES.ROOT + this.SEP;
+
         let sensesDataList = [
-            this.makeListLabelValue("Override Senses", settings[WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.ROOT + this.SEP + WS_API.FIELDS.SENSES.OVERRIDE)
+            this.makeListLabelValue(overrideName, settings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.OVERRIDE)
         ];
 
-        if (!shifterId && !config[WS_API.FIELDS.SENSES.OVERRIDE])
+        if (shifterId && !config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
         {
-            sensesDataList.push(this.makeListLabel("NOTE: Current Master Override Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
+            sensesDataList.push(this.makeListLabel("NOTE: Current Config Write Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
         }
 
         // senses settings
-        _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, function(attr) {
-            sensesDataList.push(this.makeListLabelValue(attr, settings[WS_API.FIELDS.SENSES.ROOT][attr]) + this.makeListButton("Edit", cmdEdit + WS_API.FIELDS.SENSES.ROOT + this.SEP + attr + this.SEP + "?{Attribute|" + settings[WS_API.FIELDS.SENSES.ROOT][attr] + "}"));
+        _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, (attr) => {
+            const currAttr = settings[WS_API.FIELDS.SENSES.ROOT][attr];
+            
+            let attrField = this.makeListLabelValue(attr, currAttr);
+            if (currAttr === false || currAttr === true) 
+                attrField = attrField + this.makeListButton("Toggle", cmdEdit + attr + this.SEP + WS_API.FIELDS.TOGGLE);
+            else
+                attrField = attrField + this.makeListButton("Edit", cmdEdit + attr + this.SEP + "?{Attribute|" + currAttr + "}");
+        
+            sensesDataList.push(attrField);
         });
 
-        let contents = this.makeList(sensesDataList);
+        let contents = this.makeList(sensesDataList)
+            + "<hr>" + this.makeButton(cmdBackName, cmdBack, ' width: 100%');
         this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + menuTitle);
     }
 
@@ -245,7 +277,8 @@ class WildShapeMenu extends WildMenu
             this.makeListLabelValue("Name", shapeId) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.NAME + this.SEP + "?{Edit Name|" + shapeId + "}"),
             this.makeListLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + npcs + "}"),
             this.makeListLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
-            this.makeListLabelValue("Override Senses", obj[WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeListLabelValue("Force Senses", obj[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
         const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
@@ -289,7 +322,8 @@ class WildShapeMenu extends WildMenu
             this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"),
             this.makeListLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeListButton("Toggle", cmdShifterEdit + WS_API.FIELDS.MAKEROLLPUBLIC),
             this.makeListLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"),
-            this.makeListLabelValue("Override Senses", shifterSettings[WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeListLabelValue("Force Senses", shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
         //listItems.push(this.makeList(settingsDataList, " padding-left: 10px"));
@@ -402,8 +436,8 @@ class WildShapeMenu extends WildMenu
         // senses settings
         let sensesDataList = [
             this.makeListLabel("<p style='font-size: 120%'><b>Default Senses:</b></p>"),
-            this.makeListLabel("Defaults set on the token if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
-            this.makeListLabelValue("Override Senses", config[WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
+            this.makeListLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeListLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
         ];
 
         // finalization
@@ -520,6 +554,7 @@ var WildShape = WildShape || (function() {
     async function getCharacterData(shiftData, isNpc, isDefault) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
+        const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
 
         let data = {};
         
@@ -530,77 +565,9 @@ var WildShape = WildShape || (function() {
         let acName;
         let speedName;
 
-        let senses = {
-            light_radius: 5,
-            light_dimradius: -5,
-            light_otherplayers: false,
-            light_angle: 360,
-            light_losangle: 360,
-            light_multiplier: 1, 
-            light_hassight: true,
-        };
+        let senses = null;
 
-        const lightAttrs = [
-            "light_radius",
-            "light_dimradius",
-            "light_otherplayers",
-            "light_angle",
-            "light_losangle",
-            "light_multiplier", 
-            "light_hassight"];
-
-        // check if we are transforming to the default shape
-        if (isDefault)
-        {
-            if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
-            {
-                // restore from cached data
-                _.each(lightAttrs, function saveAttr(attr) {
-                    senses[attr] = shifterSettings[config.NPC_DATA.SENSES_CACHE][attr];
-                });
-            }
-            else
-                return null;
-        }
-        else
-        {
-            if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.DEFAULTS.BASE_SHAPE)
-            {
-                // cache current token values
-                _.each(lightAttrs, function saveAttr(attr) {
-                    shifterSettings[config.NPC_DATA.SENSES_CACHE][attr] = shiftData.token.get(attr);
-                });
-            }
-
-            if (isNpc)
-            {
-                // get npc senses 
-                let targetSenses = getAttrByName(shiftData.targetCharacterId, "npc_senses");
-                if (targetSenses)
-                {
-                    // set radius to darkvision
-                    let visionSense = targetSenses.match(/darkvision\s([0-9]+)/);
-                    let hasDarkvision = visionSense && visionSense.length >= 2; 
-                    if (hasDarkvision)
-                        senses.light_radius = visionSense[1];
-
-                    visionSense = targetSenses.match(/blindsight\s([0-9]+)/);
-                    if (visionSense && visionSense.length >= 2)
-                    {
-                        // set end of bright radius to blindsight
-                        senses.dimradius = visionSense[1];
-                        if (!hasDarkvision)
-                            senses.light_radius = senses.light_dimradius;
-                    }
-                }
-            }
-            else
-            {
-                // cannot get vision senses from PC, keep defaults
-            }
-        }
-
-
+        // setup token data
         if(isNpc)
         {
             hpName      = config.NPC_DATA.HP;
@@ -609,14 +576,13 @@ var WildShape = WildShape || (function() {
 
             // get token image
             targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
-            if (targetImg == "")
+            if (!targetImg || targetImg == "")
             {
                 UTILS.chatErrorToPlayer(shiftData.who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
                 return null;
             }
             
             // get token size
-            const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
             targetSize =  getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
             if (targetSize === 0)
             {
@@ -635,11 +601,11 @@ var WildShape = WildShape || (function() {
             await getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
                 targetImg = img;
 
-                if (targetImg == "")
+                if (!targetImg || targetImg == "")
                 {
                     targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
 
-                    if (targetImg == "")
+                    if (!targetImg || targetImg == "")
                     {
                         UTILS.chatErrorToPlayer(shiftData.who, "cannot find token or avatar image for PC " + shiftData.targetCharacterId);
                         return null;
@@ -655,60 +621,81 @@ var WildShape = WildShape || (function() {
                 targetSize = 1;
         }
 
-        let hpObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: hpName})[0];
-        let acObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: acName})[0];
-        let speedObj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: speedName})[0];
-        
-        if(hpObj)
         {
-            data.hp             = {};
-            data.hp.current     = hpObj.get('current');
-            data.hp.max         = hpObj.get('max');
-            data.hp.id          = hpObj.id;
-        }
-        else
-        {
-            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + hpName + "] on character: " + shiftData.targetCharacterId);
-            return null;
+            // setup other output data
+            data.imgsrc = targetImg;
+            data.characterId = shiftData.targetCharacterId;
+            data.controlledby = shiftData.shifterControlledby;
+            data.tokenSize = targetSize;
         }
 
-        if (acObj)
+        // setup hp/ac/speed on token bars
+        function setTokenBarValue(fieldId, attrName)
         {
-            data.ac             = {};
-            data.ac.current     = acObj.get('current');
-            data.ac.max         = acObj.get('max');
-            data.ac.id          = acObj.id;
-        }
-        else
-        {
-            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + acName + "] on character: " + shiftData.targetCharacterId);
-            return null;
-        }
-
-        if (speedObj)
-        {
-            data.speed          = {};
-            data.speed.current  = speedObj.get('current');
-            data.speed.max      = speedObj.get('max');
-            data.speed.id       = speedObj.id;
-        }
-        else
-        {
-            UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + speedName + "] on character: " + shiftData.targetCharacterId);
-            return null;
+            let obj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: attrName})[0];
+            if(obj)
+            {
+                data[fieldId]             = {};
+                data[fieldId].current     = obj.get('current');
+                data[fieldId].max         = obj.get('max');
+                data[fieldId].id          = obj.id;
+                return true;
+            }
+            else
+            {
+                UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + attrName + "] on character: " + characterId);
+                return false;
+            }
         }
 
-        if (targetImg == "")
-        {
-            UTILS.chatError("cannot find target image");
-            return null;
-        }
+        if (!setTokenBarValue("hp", hpName)) return false;
+        if (!setTokenBarValue("ac", acName)) return false;
+        if (!setTokenBarValue("speed", speedName)) return false;
 
-        data.imgsrc = targetImg;
-	    data.characterId = shiftData.targetCharacterId;
-        data.controlledby = shiftData.shifterControlledby;
-        data.tokenSize = targetSize;
-        data.senses = senses;
+        // setup senses
+        if (config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+        {
+            let senses = {};
+
+            if (targetData[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+            {
+                _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, (attr) => {
+                    senses[attr] = targetData[WS_API.FIELDS.SENSES.ROOT][attr];
+                });
+            }
+            else
+            {
+                // copy the defaults
+                _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, (attr) => {
+                    senses[attr] = config[WS_API.FIELDS.SENSES.ROOT][attr];
+                });
+
+                if (isNpc)
+                {
+                    // get npc senses
+                    let targetSenses = getAttrByName(shiftData.targetCharacterId, "npc_senses");
+                    if (targetSenses)
+                    {
+                        // set radius to darkvision
+                        let visionSense = targetSenses.match(/darkvision\s([0-9]+)/);
+                        let hasDarkvision = visionSense && visionSense.length >= 2; 
+                        if (hasDarkvision)
+                            senses.light_radius = visionSense[1];
+
+                        visionSense = targetSenses.match(/blindsight\s([0-9]+)/);
+                        if (visionSense && visionSense.length >= 2)
+                        {
+                            // set end of bright radius to blindsight
+                            senses.light_dimradius = visionSense[1];
+                            if (!hasDarkvision)
+                                senses.light_radius = senses.light_dimradius;
+                        }
+                    }
+                }
+            }
+
+            data.senses = senses;
+        }
 
         // special handling of NPC ShapeShifter to restore hp when going back to original form, as they don't store the current in hp
         if(shifterSettings[WS_API.FIELDS.ISNPC])
@@ -900,19 +887,13 @@ var WildShape = WildShape || (function() {
             width: tokenBaseSize * targetData.tokenSize,
         });
 
-        // set token vision
-        const lightAttrs = [
-            "light_radius",
-            "light_dimradius",
-            "light_otherplayers",
-            "light_angle",
-            "light_losangle",
-            "light_multiplier", 
-            "light_hassight"];
-
-        _.each(lightAttrs, function setLightAttr(attr) {
-            shiftData.token.set(attr, targetData.senses[attr]);
-        });
+        // set token sense
+        if (targetData.senses)
+        {
+            _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, function setLightAttr(attr) {
+                shiftData.token.set(attr, targetData.senses[attr]);
+            });
+        }
 
         if (!isTargetDefault)
         {
@@ -924,7 +905,7 @@ var WildShape = WildShape || (function() {
         return true;
     }
 
-    const addShapeToShifter = (shifter, shapeCharacter, shapeId = null, doSort = true) => {
+    const addShapeToShifter = (config, shifter, shapeCharacter, shapeId = null, doSort = true) => {
         const shapeName = shapeCharacter.get('name');
         if ((!shapeId) || (typeof shapeId !== 'string') || (shapeId.length == 0))
             shapeId = shapeName;
@@ -939,7 +920,9 @@ var WildShape = WildShape || (function() {
         shape[WS_API.FIELDS.ID] = shapeCharacter.get('id');
         shape[WS_API.FIELDS.CHARACTER] = shapeName;
         shape[WS_API.FIELDS.SIZE] = WS_API.DEFAULTS.SHAPE_SIZE;
-        shape[WS_API.FIELDS.SENSES.OVERRIDE] = false;
+
+        copySenses(config, shape);
+        shape[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
         
         shifter[WS_API.FIELDS.SHAPES][shapeId] = shape;
 
@@ -1042,8 +1025,10 @@ var WildShape = WildShape || (function() {
                     shifterSettings[WS_API.FIELDS.ISDRUID] = !isNpc;
                     shifterSettings[WS_API.FIELDS.ISNPC] = isNpc;
                     shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC] = !isNpc;
-                    shifterSettings[WS_API.FIELDS.SENSES.OVERRIDE] = false;
                     shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = WS_API.DEFAULTS.BASE_SHAPE;
+
+                    copySenses(config, shifterSettings);
+                    shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
 
                     shifter[WS_API.FIELDS.SETTINGS] = shifterSettings;
                     shifter[WS_API.FIELDS.SHAPES] = {};
@@ -1083,7 +1068,7 @@ var WildShape = WildShape || (function() {
                 let shapeObj = findObjs({ type: 'character', name: shapeName });
                 if(shapeObj && shapeObj.length == 1)
                 {
-                    if(addShapeToShifter(shifter, shapeObj[0], shapeKey))
+                    if(addShapeToShifter(config, shifter, shapeObj[0], shapeKey))
                         MENU.showEditShifter(shifterKey);
                 }
                 else
@@ -1166,6 +1151,27 @@ var WildShape = WildShape || (function() {
         }
     };
 
+    const handleInputEditSenses = (msg, args, config, senses) => 
+    {
+        const field = args.shift();
+        if (field)
+        {
+            if (field == WS_API.FIELDS.SENSES.OVERRIDE)
+                senses[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = !senses[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE];
+            else if (field)
+            {
+                let newValue = args.shift();
+                if (newValue)
+                {
+                    if (newValue == WS_API.FIELDS.TOGGLE)
+                        senses[WS_API.FIELDS.SENSES.ROOT][field] = !senses[WS_API.FIELDS.SENSES.ROOT][field];
+                    else 
+                        senses[WS_API.FIELDS.SENSES.ROOT][field] = newValue;
+                }
+            }
+        }
+    };
+
     const handleInputEditShifter = (msg, args, config) => 
     {
         let shifterKey = args.shift();
@@ -1175,67 +1181,76 @@ var WildShape = WildShape || (function() {
             const field = args.shift();
             if (field)
             {
-                let isValueSet = false;
-                let newValue = args.shift();
-                if(field == WS_API.FIELDS.NAME)
+                if (field == WS_API.FIELDS.SENSES.ROOT)
                 {
-                    let oldShifterKey = shifterKey; 
-                    shifterKey = newValue.trim();
-
-                    if (shifterKey && shifterKey.length > 0)
-                    {
-                        if(!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey])
-                        {
-                            state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey] = shifter;
-                            delete state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][oldShifterKey];
-                            sortShifters();
-                            isValueSet = true;
-                        }
-                        else
-                        {
-                            UTILS.chatError("Trying to add ShapeShifter " + shifterKey + " which already exists");
-                        }
-                    }
-                }
-                else if(field == WS_API.FIELDS.CHARACTER)
-                {
-                    let charObj = findObjs({ type: 'character', name: newValue });
-                    if(charObj && charObj.length == 1)
-                    {
-                        shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] = charObj[0].get('id');
-                        shifter[WS_API.FIELDS.SETTINGS][field] = newValue;
-                        isValueSet = true;
-
-                        const shifterControlledBy = charObj[0].get("controlledby");
-                        _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
-                            let shapeObj = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] });
-                            if (shapeObj && shapeObj.length == 1)
-                                shapeObj[0].set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
-                        });
-                    }
-                    else
-                    {
-                        UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
-                    }
-                }
-                else if(field == WS_API.FIELDS.ISDRUID)
-                {
-                    shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID];
-                    isValueSet = true;
-                }
-                else if(field == WS_API.FIELDS.MAKEROLLPUBLIC)
-                {
-                    shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC];
-                    isValueSet = true;
+                    handleInputEditSenses(msg, args, config, shifter[WS_API.FIELDS.SETTINGS]);
+                    MENU.showEditSenses(shifterKey);
+                    return;
                 }
                 else
                 {
-                    shifter[WS_API.FIELDS.SETTINGS][field] = newValue;
-                    isValueSet = true;
-                }
+                    let isValueSet = false;
+                    let newValue = args.shift();
+                    if(field == WS_API.FIELDS.NAME)
+                    {
+                        let oldShifterKey = shifterKey; 
+                        shifterKey = newValue.trim();
 
-                if(isValueSet)
-                    MENU.showEditShifter(shifterKey);
+                        if (shifterKey && shifterKey.length > 0)
+                        {
+                            if(!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey])
+                            {
+                                state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey] = shifter;
+                                delete state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][oldShifterKey];
+                                sortShifters();
+                                isValueSet = true;
+                            }
+                            else
+                            {
+                                UTILS.chatError("Trying to add ShapeShifter " + shifterKey + " which already exists");
+                            }
+                        }
+                    }
+                    else if(field == WS_API.FIELDS.CHARACTER)
+                    {
+                        let charObj = findObjs({ type: 'character', name: newValue });
+                        if(charObj && charObj.length == 1)
+                        {
+                            shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] = charObj[0].get('id');
+                            shifter[WS_API.FIELDS.SETTINGS][field] = newValue;
+                            isValueSet = true;
+
+                            const shifterControlledBy = charObj[0].get("controlledby");
+                            _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
+                                let shapeObj = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] });
+                                if (shapeObj && shapeObj.length == 1)
+                                    shapeObj[0].set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                            });
+                        }
+                        else
+                        {
+                            UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                        }
+                    }
+                    else if(field == WS_API.FIELDS.ISDRUID)
+                    {
+                        shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ISDRUID];
+                        isValueSet = true;
+                    }
+                    else if(field == WS_API.FIELDS.MAKEROLLPUBLIC)
+                    {
+                        shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC] = !shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.MAKEROLLPUBLIC];
+                        isValueSet = true;
+                    }
+                    else
+                    {
+                        shifter[WS_API.FIELDS.SETTINGS][field] = newValue;
+                        isValueSet = true;
+                    }
+
+                    if(isValueSet)
+                        MENU.showEditShifter(shifterKey);
+                }
             }
             else
                 MENU.showEditShifter(shifterKey);
@@ -1259,74 +1274,83 @@ var WildShape = WildShape || (function() {
                 let field = args.shift();
                 if (field)
                 {
-                    let isValueSet = false;
-                    let newValue = args.shift();
-                    if(field == WS_API.FIELDS.CHARACTER)
+                    if (field == WS_API.FIELDS.SENSES.ROOT)
                     {
-                        let shapeObj = findObjs({ type: 'character', name: newValue });
-                        if(shapeObj && shapeObj.length == 1)
-                        {
-                            // clear old shape data
-                            const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                            if (oldShapeCharacter)
-                            {
-                                oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
-                            }
-
-                            // set new shape id
-                            shape[WS_API.FIELDS.ID] = shapeObj[0].get('id');
-                            
-                            // set new shape data
-                            const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
-                            if (shifterCharacter)
-                            {
-                                const shifterControlledBy = shifterCharacter.get("controlledby");
-                                shapeObj[0].set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
-                            }
-
-                            const oldCharacterName = shape[field];
-                            shape[field] = newValue;
-                            isValueSet = true;
-                            
-                            if (oldCharacterName == shapeKey)
-                            {
-                                // also rename id
-                                field = WS_API.FIELDS.NAME;
-                            }
-                        }
-                        else
-                        {
-                            UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
-                        }
-                    }                                                            
-
-                    if(field == WS_API.FIELDS.NAME)
+                        handleInputEditSenses(msg, args, config, shape);
+                        MENU.showEditSenses(shifterKey, shapeKey);
+                        return;
+                    }
+                    else
                     {
-                        let oldShapeKey = shapeKey;
-                        shapeKey = newValue.trim();
-                        if (shapeKey && shapeKey.length > 0)
+                        let isValueSet = false;
+                        let newValue = args.shift();
+                        if(field == WS_API.FIELDS.CHARACTER)
                         {
-                            if(!shifter[WS_API.FIELDS.SHAPES][shapeKey])
+                            let shapeObj = findObjs({ type: 'character', name: newValue });
+                            if(shapeObj && shapeObj.length == 1)
                             {
-                                shifter[WS_API.FIELDS.SHAPES][shapeKey] = shape;
-                                delete shifter[WS_API.FIELDS.SHAPES][oldShapeKey];
-                                sortShapes(shifter);
+                                // clear old shape data
+                                const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+                                if (oldShapeCharacter)
+                                {
+                                    oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                }
+
+                                // set new shape id
+                                shape[WS_API.FIELDS.ID] = shapeObj[0].get('id');
+                                
+                                // set new shape data
+                                const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
+                                if (shifterCharacter)
+                                {
+                                    const shifterControlledBy = shifterCharacter.get("controlledby");
+                                    shapeObj[0].set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                                }
+
+                                const oldCharacterName = shape[field];
+                                shape[field] = newValue;
                                 isValueSet = true;
+                                
+                                if (oldCharacterName == shapeKey)
+                                {
+                                    // also rename id
+                                    field = WS_API.FIELDS.NAME;
+                                }
                             }
                             else
                             {
-                                UTILS.chatError("Trying to add shape " + shapeKey + " which already exists");
+                                UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                            }
+                        }                                                            
+
+                        if(field == WS_API.FIELDS.NAME)
+                        {
+                            let oldShapeKey = shapeKey;
+                            shapeKey = newValue.trim();
+                            if (shapeKey && shapeKey.length > 0)
+                            {
+                                if(!shifter[WS_API.FIELDS.SHAPES][shapeKey])
+                                {
+                                    shifter[WS_API.FIELDS.SHAPES][shapeKey] = shape;
+                                    delete shifter[WS_API.FIELDS.SHAPES][oldShapeKey];
+                                    sortShapes(shifter);
+                                    isValueSet = true;
+                                }
+                                else
+                                {
+                                    UTILS.chatError("Trying to add shape " + shapeKey + " which already exists");
+                                }
                             }
                         }
-                    }
-                    else if(!isValueSet)
-                    {
-                        shape[field] = newValue;
-                        isValueSet = true;
-                    }
+                        else if(!isValueSet)
+                        {
+                            shape[field] = newValue;
+                            isValueSet = true;
+                        }
 
-                    if (isValueSet)
-                        MENU.showEditShape(shifterKey, shapeKey);
+                        if (isValueSet)
+                            MENU.showEditShape(shifterKey, shapeKey);
+                    }
                 }
                 else
                 {
@@ -1352,6 +1376,7 @@ var WildShape = WildShape || (function() {
             case WS_API.FIELDS.SEP:
             {
                 config.SEP = args.shift();
+                MENU.updateConfig();
             }
             break;
 
@@ -1376,9 +1401,16 @@ var WildShape = WildShape || (function() {
             }
             break;
 
+            case WS_API.FIELDS.SENSES.ROOT:
+            {
+                handleInputEditSenses(msg, args, config, config);
+                MENU.showEditSenses();
+                return;
+            }
+            break;
+
         }
 
-        MENU.updateConfig();
         MENU.showConfigMenu();
     };
 
@@ -1431,7 +1463,7 @@ var WildShape = WildShape || (function() {
                         }
 
                         // add shape to shifter
-                        if(!addShapeToShifter(shifter, shapeObj, shapeId, false))
+                        if(!addShapeToShifter(config, shifter, shapeObj, shapeId, false))
                             shapeObj.set("name", oldName);
                     }
                 });
@@ -1582,6 +1614,20 @@ var WildShape = WildShape || (function() {
         }
     };
 
+    const copySenses = (from, to) =>
+    {
+        const fromSenses = from[WS_API.FIELDS.SENSES.ROOT];        
+        let toSenses = {};
+
+        _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, function (attr)
+        {
+            toSenses[attr] = fromSenses[attr];
+        });
+
+        toSenses[WS_API.FIELDS.SENSES.OVERRIDE] = fromSenses[WS_API.FIELDS.SENSES.OVERRIDE];
+        to[WS_API.FIELDS.SENSES.ROOT] = toSenses;
+    }; 
+
     const upgradeVersion = () => {
         const currentVersion = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
         const newConfig = WS_API.DEFAULTS.CONFIG;
@@ -1630,15 +1676,20 @@ var WildShape = WildShape || (function() {
         {
             upgradeLog.push("1.0.6");
 
-            config[WS_API.FIELDS.SENSES.OVERRIDE] = newConfig[WS_API.FIELDS.SENSES.OVERRIDE];
-            config[WS_API.FIELDS.SENSES.ROOT] = newConfig[WS_API.FIELDS.SENSES.ROOT];
+            // copy defaults in config
+            copySenses(newConfig, config);
 
             _.each(shifters, (value, shifterId) => {
                 let shifterSettings = shifters[shifterId][WS_API.FIELDS.SETTINGS];
-                shifterSettings[WS_API.FIELDS.SENSES.OVERRIDE] = false;
+
+                // copy defaults in all shifters
+                copySenses(newConfig, shifterSettings);
+                shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
 
                 _.each(shifters[shifterId][WS_API.FIELDS.SHAPES], (shapeValue, shapeId) => {
-                    shapeValue[WS_API.FIELDS.SENSES.OVERRIDE] = false;
+                    // copy defaults in all shapes
+                    copySenses(newConfig, shapeValue);
+                    shapeValue[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
                 });
             });
         }
