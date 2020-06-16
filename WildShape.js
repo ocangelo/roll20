@@ -13,6 +13,8 @@ importing a monster from the MonsterManual:
 const WS_API = {
     NAME : "WildShape",
     VERSION : "1.0.6",
+    REQUIRED_HELPER_VERSION: "1.0",
+
     STATENAME : "WILDSHAPE",
     DEBUG : false,
 
@@ -1745,6 +1747,12 @@ var WildShape = WildShape || (function() {
 
     const start = () => {
         // check install
+        if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
+        {
+            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelper script");
+            return;
+        }
+
         setDefaults();
 
         // register event handlers

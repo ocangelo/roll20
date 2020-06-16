@@ -3,6 +3,7 @@
 class WildUtils {
     constructor(apiName) {
         this.APINAME = apiName || "API";
+        this.VERSION = "1.0";
     }
 
     chat(msg, callback = null, settings = {noarchive:true}) {
