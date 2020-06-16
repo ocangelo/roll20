@@ -1,6 +1,5 @@
 We use the standard 5e sheet, but it should be really easy to adapt it to other sheets if you need to do so.
 
-
 # Main features
 * can be used for both PC and NPC to shape shift into either a PC or an NPC
 * alt-double clicking on the "shape shifted" token will open the relative pc/npc sheet so that you can run actions from your new shape
@@ -24,9 +23,9 @@ Here is an example with the before an after clicking on the "Tiger" button, with
 ![3usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/3-usage.JPG)
 
 # Install
-First of all, I put all my utils (some i wrote, some i copied and modified from around here) in a separate file which you need to add to your API before the WildShape script, you can find it here: https://github.com/ocangelo/roll20/blob/master/WildHelpers.js
+I put all my utils in a separate file which you need to add to your API before the WildShape script, you can find it here: https://github.com/ocangelo/roll20/blob/master/WildHelpers.js
 
-After that you can copy the main script from here: https://github.com/ocangelo/roll20/blob/master/WildShape/WildShape.js
+After that you can copy the main WildShape script: https://github.com/ocangelo/roll20/blob/master/WildShape/WildShape.js
 
 # Notes
 **IMPORTANT** You should always make copies of the characters for your target shapes, one for each ShapeShifter that will be able to transform into that shape, as attributes and other settings on the characters might be changed when they transform into it.
@@ -60,6 +59,14 @@ Here you can setup which values you want associated to which bars on the token (
 **NOTE**: Clicking on "**Reset**" will also delete all your shapeshifters.
 
 ![4config](https://github.com/ocangelo/roll20/blob/master/WildShape/images/4-config.JPG)
+
+One available feature is to automatically write senses (vision, light, etc.) to the token for you, this feature is enabled by default.
+
+The API will automatically grab the "darkvision" and "blindsight" values from the NPC Data "SENSES" attribute and set them as dim/bright light radius; you can also force different senses data per shape/shifter if you need to do so (useful to define the base darkvision settings for your elf druid when he/she transforms to the default shape for instance).
+
+In the main menu you can enable/disable the feature and set the defaults in case the data cannot be retried and the values are not overridden at the shape/shifter level.
+
+![9-writeSenses](https://github.com/ocangelo/roll20/blob/master/WildShape/images/9-writeSenses.JPG)
 
 the Edit Shifter brings you to this menu where you can add shifters simply by clicking on their tokens (targeting), it will recognize if you are adding a PC or an NPC:
 
