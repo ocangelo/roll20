@@ -452,12 +452,12 @@ class WildShapeMenu extends WildMenu
         const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET + this.SEP + "?{Are you sure?|no|yes}", ' width: 100%');
 
         let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((newVersion) ? ': New Version Setup' : ': Config');
-        let contents = showShiftersButton
-                        + '<hr>' + this.makeList(otherSettingsList)
-                        + '<hr>' + this.makeList(tokenDataList)
-                        + '<hr>' + this.makeList(pcDataList)
-                        + '<hr>' + this.makeList(npcDataList)
-                        + '<hr>' + this.makeList(sensesDataList)
+        let contents = showShiftersButton + '<hr>'
+                        + this.makeList(otherSettingsList)
+                        + this.makeList(tokenDataList)
+                        + this.makeList(pcDataList)
+                        + this.makeList(npcDataList)
+                        + this.makeList(sensesDataList)
                         + '<hr>' + resetButton;
 
         this.showMenu(WS_API.NAME, contents, title_text);
