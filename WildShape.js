@@ -37,6 +37,7 @@ const WS_API = {
 
             NPC_DATA : {
                 HP_CACHE: "npcCachedHp",
+                //SENSES_CACHE: "npcCachedSenses",
                 HP: "hp",
                 AC: "npc_ac",
                 SPEED: "npc_speed",
@@ -437,7 +438,78 @@ var WildShape = WildShape || (function() {
         let hpName;
         let acName;
         let speedName;
-        
+/*
+        let senses = {
+            light_radius: 5,
+            light_dimradius: -5,
+            light_otherplayers: false,
+            light_angle: 360,
+            light_losangle: 360,
+            light_multiplier: 1, 
+            light_hassight: true,            
+        };
+
+        const lightAttrs = [
+            "light_radius",
+            "light_dimradius",
+            "light_otherplayers",
+            "light_angle",
+            "light_losangle",
+            "light_multiplier", 
+            "light_hassight"];
+
+        // check if we are transforming to the default shape
+        if (isDefault)
+        {
+            if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
+            {
+                // restore from cached data
+                _.each(lightAttrs, function saveAttr(attr) {
+                    senses[attr] = shifterSettings[config.NPC_DATA.SENSES_CACHE][attr];
+                });
+            }
+            else
+                return null;
+        }
+        else
+        {
+            if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.DEFAULTS.BASE_SHAPE)
+            {
+                // cache current token values
+                _.each(lightAttrs, function saveAttr(attr) {
+                    shifterSettings[config.NPC_DATA.SENSES_CACHE][attr] = shiftData.token.get(attr);
+                });
+            }
+
+            if (isNpc)
+            {
+                // get npc senses 
+                let targetSenses = getAttrByName(shiftData.targetCharacterId, "npc_senses");
+                if (targetSenses)
+                {
+                    // set radius to darkvision
+                    let visionSense = targetSenses.match(/darkvision\s([0-9]+)/);
+                    let hasDarkvision = visionSense && visionSense.length >= 2; 
+                    if (hasDarkvision)
+                        senses.light_radius = visionSense[1];
+
+                    visionSense = targetSenses.match(/blindsight\s([0-9]+)/);
+                    if (visionSense && visionSense.length >= 2)
+                    {
+                        // set end of bright radius to blindsight
+                        senses.dimradius = visionSense[1];
+                        if (!hasDarkvision)
+                            senses.light_radius = senses.light_dimradius;
+                    }
+                }
+            }
+            else
+            {
+                // cannot get vision senses from PC, keep defaults
+            }
+        }
+*/
+
         if(isNpc)
         {
             hpName      = config.NPC_DATA.HP;
@@ -545,6 +617,7 @@ var WildShape = WildShape || (function() {
 	    data.characterId = shiftData.targetCharacterId;
         data.controlledby = shiftData.shifterControlledby;
         data.tokenSize = targetSize;
+        //data.senses = senses;
 
         // special handling of NPC ShapeShifter to restore hp when going back to original form, as they don't store the current in hp
         if(shifterSettings[WS_API.FIELDS.ISNPC])
@@ -735,6 +808,21 @@ var WildShape = WildShape || (function() {
             height: tokenBaseSize * targetData.tokenSize,
             width: tokenBaseSize * targetData.tokenSize,
         });
+
+/*
+        const lightAttrs = [
+            "light_radius",
+            "light_dimradius",
+            "light_otherplayers",
+            "light_angle",
+            "light_losangle",
+            "light_multiplier", 
+            "light_hassight"];
+
+        _.each(lightAttrs, function setLightAttr(attr) {
+            shiftData.token.set(attr, targetData.senses[attr]);
+        });
+        */
 
         if (!isTargetDefault)
         {
