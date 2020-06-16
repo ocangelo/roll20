@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.6",
+    VERSION : "1.0.6.1",
     REQUIRED_HELPER_VERSION: "1.0",
 
     STATENAME : "WILDSHAPE",
@@ -1172,6 +1172,8 @@ var WildShape = WildShape || (function() {
                 }
             }
         }
+
+        return field;
     };
 
     const handleInputEditShifter = (msg, args, config) => 
@@ -1185,7 +1187,16 @@ var WildShape = WildShape || (function() {
             {
                 if (field == WS_API.FIELDS.SENSES.ROOT)
                 {
-                    handleInputEditSenses(msg, args, config, shifter[WS_API.FIELDS.SETTINGS]);
+                    let shifterSettings = shifter[WS_API.FIELDS.SETTINGS];
+                    const editedSense = handleInputEditSenses(msg, args, config, shifterSettings);
+
+                    // copy defaults in shifter if we are setting override to false
+                    if(editedSense == WS_API.FIELDS.SENSES.OVERRIDE && !shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+                    {
+                        copySenses(config, shifterSettings);
+                        shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
+                    }
+
                     MENU.showEditSenses(shifterKey);
                     return;
                 }
@@ -1278,7 +1289,15 @@ var WildShape = WildShape || (function() {
                 {
                     if (field == WS_API.FIELDS.SENSES.ROOT)
                     {
-                        handleInputEditSenses(msg, args, config, shape);
+                        const editedSense = handleInputEditSenses(msg, args, config, shape);
+
+                        // copy defaults in shape if we are setting override to false
+                        if(editedSense == WS_API.FIELDS.SENSES.OVERRIDE && !shape[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+                        {
+                            copySenses(config, shape);
+                            shape[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
+                        }
+
                         MENU.showEditSenses(shifterKey, shapeKey);
                         return;
                     }
@@ -1405,7 +1424,31 @@ var WildShape = WildShape || (function() {
 
             case WS_API.FIELDS.SENSES.ROOT:
             {
-                handleInputEditSenses(msg, args, config, config);
+                const editedSense = handleInputEditSenses(msg, args, config, config);
+                if(editedSense && editedSense !== WS_API.FIELDS.SENSES.OVERRIDE)
+                {
+                    let newSenseValue = config[WS_API.FIELDS.SENSES.ROOT][editedSense];
+                    
+                    // update default senses on all shifters/shapes that are not overriding
+                    _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (shifterValue, shifterId) => {
+                        let shifterSettings = shifterValue[WS_API.FIELDS.SETTINGS];
+
+                        // copy defaults in shifters
+                        if (!shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+                        {
+                            shifterSettings[WS_API.FIELDS.SENSES.ROOT][editedSense] = newSenseValue;
+                        }
+
+                        _.each(shifterValue[WS_API.FIELDS.SHAPES], (shapeValue, shapeId) => {
+                            // copy defaults in shapes
+                            if (!shapeValue[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
+                            {
+                                shapeValue[WS_API.FIELDS.SENSES.ROOT][editedSense] = newSenseValue;
+                            }
+                        });
+                    });
+                }
+
                 MENU.showEditSenses();
                 return;
             }
@@ -1698,7 +1741,7 @@ var WildShape = WildShape || (function() {
 
         config.VERSION = WS_API.VERSION;
 
-        return upgradeLog;
+        return upgradeLog.length > 0 ? upgradeLog : null;
     };
 
     const setDefaults = (reset) => {
@@ -1734,13 +1777,18 @@ var WildShape = WildShape || (function() {
         {
             MENU.showConfigMenu(true);
 
-            if (upgradeLog)
+            if (oldVersionDetected)
             {
-                _.each(upgradeLog, function (version) {
-                    UTILS.chat("Upgraded to " + version + ": " + WS_API.CHANGELOG[version]);
-                });
+                if (upgradeLog)
+                {
+                    _.each(upgradeLog, function (version) {
+                        UTILS.chat("Upgraded to " + version + ": " + WS_API.CHANGELOG[version]);
+                    });
 
-                UTILS.chat("New version detected, upgraded from " + oldVersionDetected + " to " + WS_API.VERSION);
+                    UTILS.chat("New version detected, upgraded from " + oldVersionDetected + " to " + WS_API.VERSION);
+                }
+                else
+                    UTILS.chat("New version detected: " + WS_API.VERSION);
             }
         }
     };
