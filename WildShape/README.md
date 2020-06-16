@@ -1,5 +1,10 @@
 We use the standard 5e sheet, but it should be really easy to adapt it to other sheets if you need to do so.
 
+# Install
+I put all my utils in a **separate file** which you **need to add** to your API **before the WildShape script**, you can find it here: https://github.com/ocangelo/roll20/blob/master/WildHelpers.js
+
+After that you can copy the main WildShape script: https://github.com/ocangelo/roll20/blob/master/WildShape/WildShape.js
+
 # Main features
 * can be used for both PC and NPC to shape shift into either a PC or an NPC
 * alt-double clicking on the "shape shifted" token will open the relative pc/npc sheet so that you can run actions from your new shape
@@ -21,11 +26,6 @@ Here is an example with the before an after clicking on the "Tiger" button, with
 ![1usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/1-usage.JPG)
 ![2usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/2-usage.JPG)
 ![3usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/3-usage.JPG)
-
-# Install
-I put all my utils in a separate file which you need to add to your API before the WildShape script, you can find it here: https://github.com/ocangelo/roll20/blob/master/WildHelpers.js
-
-After that you can copy the main WildShape script: https://github.com/ocangelo/roll20/blob/master/WildShape/WildShape.js
 
 # Notes
 **IMPORTANT** You should always make copies of the characters for your target shapes, one for each ShapeShifter that will be able to transform into that shape, as attributes and other settings on the characters might be changed when they transform into it.
