@@ -45,7 +45,7 @@ For instance if you have 2 PCs and 1 NPC being able to transform into a "Giant T
 
 # Wishlist
 Things i would like to add in future if i have time:
-* automatically set vision data
+* when dropping a new shifter token (e.g. from the journal) automatically change the token to the current shape (useful when moving between maps)
 * some sort of categorization to the shape list, maybe player-created so they can split/organize the list shown when they try to shapeshift in any way they want (right now it's alphabetical)
 * see if i can copy saves/skills/proficiencies from druids to npcs
 * adding some sort of json import/export for shifters and/or shape lists
