@@ -75,6 +75,25 @@ class WildUtils {
         return ordered;
     }
 
+    setAttribute(characterId, attrName, attrCurrent, createAttr = false, attrMax = null) {
+        let targetAttr = findObjs({_type: "attribute", name: attrName, _characterid: characterId})[0];
+        if (targetAttr)
+        {
+            targetAttr.set('current', attrCurrent);
+            if (attrMax)
+                targetAttr.set('max', attrMax);
+        }
+        else if (createAttr)
+        {
+            targetAttr = createObj('attribute', {
+                characterid: characterId,
+                name: attrName,
+                current: attrCurrent,
+                max: (attrMax ? attrMax : "")
+            });
+        }
+    }
+
     copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
         if(!toPrefix)
             toPrefix = "";

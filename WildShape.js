@@ -690,27 +690,13 @@ var WildShape = WildShape || (function() {
         }
 
         // override default rolltype, whisper and autoroll damage settings to: toggle, visible to everyone and don't auto roll damage
+        // sometimes as a default values these attributes don't exist at all so we need to create them 
         if (shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC])
         {
-            let targetAttr = findObjs({_type: "attribute", name: "rtype", _characterid: shiftData.targetCharacterId})[0];
-            if (targetAttr)
-            {
-                targetAttr.set('current', "@{advantagetoggle}");
- 
-                targetAttr = findObjs({_type: "attribute", name: "advantagetoggle", _characterid: shiftData.targetCharacterId})[0];
-                if (targetAttr)
-                    targetAttr.set('current', "{{query=1}} {{normal=1}} {{r2=[[0d20");
-            }
-
-            targetAttr = findObjs({_type: "attribute", name: "wtype", _characterid: shiftData.targetCharacterId})[0];
-            if (targetAttr) 
-                targetAttr.set('current', "");
-
-/* this currently doesn't work
-            targetAttr = findObjs({_type: "attribute", name: "dtype", _characterid: shiftData.targetCharacterId})[0];
-            if (targetAttr)
-                targetAttr.set('current', "pick");
-*/
+            UTILS.setAttribute(shiftData.targetCharacterId, "rtype", "@{advantagetoggle}", true);
+            UTILS.setAttribute(shiftData.targetCharacterId, "advantagetoggle", "{{query=1}} {{normal=1}} {{r2=[[0d20", true);
+            UTILS.setAttribute(shiftData.targetCharacterId, "wtype", "", true);
+            UTILS.setAttribute(shiftData.targetCharacterId, "dtype", "pick", true);
         }
 
         // we need to turn bar visibility on if the target is controlled by a player
