@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.6.1",
+    VERSION : "1.0.7",
     REQUIRED_HELPER_VERSION: "1.0",
 
     STATENAME : "WILDSHAPE",
@@ -43,6 +43,7 @@ const WS_API = {
                 HP: "hp",
                 AC: "npc_ac",
                 SPEED: "npc_speed",
+                SENSES: "npc_senses",
             },
 
             TOKEN_DATA : {
@@ -132,6 +133,7 @@ const WS_API = {
             HP: "HP",
             AC: "AC",
             SPEED: "SPEED",
+            SENSES: "SENSES",
         },
 
         PC_DATA : {
@@ -157,6 +159,7 @@ const WS_API = {
     },
 
     CHANGELOG : {
+        "1.0.7" : "added senses attribute setting in NPC Data",
         "1.0.6" : "added automatic senses setup for NPCs (e.g. vision, light) and senses overrides for shifters and single shapes",
         "1.0.5" : "changed default separator to minimize collisions",
         "1.0.4" : "added override roll settings (default true on PCs) to automatically set target shapes to never whisper, toggle advantage",
@@ -432,6 +435,7 @@ class WildShapeMenu extends WildMenu
                     this.makeListLabelValue("HP", config.NPC_DATA.HP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config.NPC_DATA.HP + "}"),
                     this.makeListLabelValue("AC", config.NPC_DATA.AC) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config.NPC_DATA.AC + "}"),
                     this.makeListLabelValue("SPEED", config.NPC_DATA.SPEED) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config.NPC_DATA.SPEED + "}"),
+                    this.makeListLabelValue("SENSES", config.NPC_DATA.SENSES) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SENSES + this.SEP + "?{Attribute|" + config.NPC_DATA.SENSES + "}"),
                 ], " padding-left: 10px"),
         ];
 
@@ -675,7 +679,7 @@ var WildShape = WildShape || (function() {
                 if (isNpc)
                 {
                     // get npc senses
-                    let targetSenses = getAttrByName(shiftData.targetCharacterId, "npc_senses");
+                    let targetSenses = getAttrByName(shiftData.targetCharacterId, config.NPC_DATA.SENSES);
                     if (targetSenses)
                     {
                         // set radius to darkvision
@@ -1737,6 +1741,13 @@ var WildShape = WildShape || (function() {
                     shapeValue[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
                 });
             });
+        }
+
+        if (UTILS.compareVersion(currentVersion, "1.0.7") < 0)
+        {
+            upgradeLog.push("1.0.7");
+            config.NPC_DATA.SENSES = newConfig.NPC_DATA.SENSES;
+
         }
 
         config.VERSION = WS_API.VERSION;
