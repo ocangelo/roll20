@@ -19,14 +19,14 @@ With a token selected both the GM and the player that controls that token can ru
 
 Here is an example with the before an after clicking on the "Tiger" button, with the sheet that you get by ALT+Double Clicking on the token
 
-![1usage](https://github.com/ocangelo/roll20/blob/master/images/1-usage.JPG)
-![2usage](https://github.com/ocangelo/roll20/blob/master/images/2-usage.JPG)
-![3usage](https://github.com/ocangelo/roll20/blob/master/images/3-usage.JPG)
+![1usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/1-usage.JPG)
+![2usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/2-usage.JPG)
+![3usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/3-usage.JPG)
 
 # Install
 First of all, I put all my utils (some i wrote, some i copied and modified from around here) in a separate file which you need to add to your API before the WildShape script, you can find it here: https://github.com/ocangelo/roll20/blob/master/WildHelpers.js
 
-After that you can copy the main script from here: https://github.com/ocangelo/roll20/blob/master/WildShape.js
+After that you can copy the main script from here: https://github.com/ocangelo/roll20/blob/master/WildShape/WildShape.js
 
 # Notes
 **IMPORTANT** You should always make copies of the characters for your target shapes, one for each ShapeShifter that will be able to transform into that shape, as attributes and other settings on the characters might be changed when they transform into it.
@@ -59,23 +59,23 @@ Here you can setup which values you want associated to which bars on the token (
 
 **NOTE**: Clicking on "**Reset**" will also delete all your shapeshifters.
 
-![4config](https://github.com/ocangelo/roll20/blob/master/images/4-config.JPG)
+![4config](https://github.com/ocangelo/roll20/blob/master/WildShape/images/4-config.JPG)
 
 the Edit Shifter brings you to this menu where you can add shifters simply by clicking on their tokens (targeting), it will recognize if you are adding a PC or an NPC:
 
-![5config](https://github.com/ocangelo/roll20/blob/master/images/5-config.JPG)
+![5config](https://github.com/ocangelo/roll20/blob/master/WildShape/images/5-config.JPG)
 
 Editing a shifter you can assign a different token name to it, change which character (base shape) it's linked to, and then you have a list of available shapes that you can add from drop downs (that will show either all PCs or all NPCs), or you can do a **mass import from a folder (more on this later)**
 
 **IMPORTANT**: right now i am using the token names to find shifters when they try to shapeshift, if you change it in your game you will have to edit it in the shifter settings
 
-![6-editShifter](https://github.com/ocangelo/roll20/blob/master/images/6-editShifter.JPG)
+![6-editShifter](https://github.com/ocangelo/roll20/blob/master/WildShape/images/6-editShifter.JPG)
 
 each shape has an optional "simple name" and a character associated to it, the simple name will be the one displayed on the list of available shapes when shapeshifting, if they match changing the character will automatically change the name as well.
 
 here you can also override the size of the target shape if you want to (it will show you a drop down with normal/large/huge/gargantuan options)
 
-![7-editShape](https://github.com/ocangelo/roll20/blob/master/images/7-editShape.JPG)
+![7-editShape](https://github.com/ocangelo/roll20/blob/master/WildShape/images/7-editShape.JPG)
 
 ## Import Shapes from Folder:
 
@@ -96,4 +96,4 @@ So in the screenshot below i had initially all the monsters duplicated with the 
 
 In future i can just run the same thing on the "flying" or "swimming" folder i already have prepared and they will get access to all those shapes
 
-![8-importFolder](https://github.com/ocangelo/roll20/blob/master/images/8-importFolder.JPG)
+![8-importFolder](https://github.com/ocangelo/roll20/blob/master/WildShape/images/8-importFolder.JPG)
