@@ -12,7 +12,7 @@ importing a monster from the MonsterManual:
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.7",
+    VERSION : "1.0.7.1",
     REQUIRED_HELPER_VERSION: "1.0",
 
     STATENAME : "WILDSHAPE",
@@ -884,7 +884,9 @@ var WildShape = WildShape || (function() {
         var tokenPageData = getObj("page", shiftData.token.get("pageid"));
         if (tokenPageData)
         {
-            tokenPageScale = tokenPageData.get("snapping_increment");
+            let snapping_increment = tokenPageData.get("snapping_increment");
+            if (snapping_increment && snapping_increment > 0) 
+                tokenPageScale = snapping_increment;
         }
 
         let tokenBaseSize = 70 * tokenPageScale;
