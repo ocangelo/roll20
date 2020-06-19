@@ -3,7 +3,7 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.0.7.1",
+    VERSION : "1.1",
     REQUIRED_HELPER_VERSION: "1.0",
 
     STATENAME : "WILDSHAPE",
@@ -151,7 +151,9 @@ const WS_API = {
         },        
     },
 
+    // major changes
     CHANGELOG : {
+        "1.1"   : "automatically shapeshift tokens to the last shape when copied/dropped from the journal",
         "1.0.7" : "added senses attribute setting in NPC Data",
         "1.0.6" : "added automatic senses setup for NPCs (e.g. vision, light) and senses overrides for shifters and single shapes",
         "1.0.5" : "changed default separator to minimize collisions",
@@ -455,7 +457,7 @@ class WildShapeMenu extends WildMenu
     }
 
     showShapeShiftMenu(who, playerid, shifterId, shapes) {
-        const cmdShapeShift = this.CMD.ROOT + WS_API.CMD.SHIFT + this.SEP + shifterId + this.SEP;
+        const cmdShapeShift = this.CMD.ROOT + WS_API.CMD.SHIFT + this.SEP;
 
         let contents = '';
 
@@ -490,13 +492,27 @@ var WildShape = WildShape || (function() {
         shifter[WS_API.FIELDS.SHAPES] = UTILS.sortByKey(shifter[WS_API.FIELDS.SHAPES]);
     };
 
+    const copySenses = (from, to) =>
+    {
+        const fromSenses = from[WS_API.FIELDS.SENSES.ROOT];        
+        let toSenses = {};
+
+        _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, function (attr)
+        {
+            toSenses[attr] = fromSenses[attr];
+        });
+
+        toSenses[WS_API.FIELDS.SENSES.OVERRIDE] = fromSenses[WS_API.FIELDS.SENSES.OVERRIDE];
+        to[WS_API.FIELDS.SENSES.ROOT] = toSenses;
+    }; 
+
     const getCreatureSize = (targetSize) => {        
         return targetSize ? Math.max(_.indexOf(WS_API.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0;
     };
 
-    const findShifterData = (selectedToken) => {
-        let tokenObj = getObj(selectedToken._type, selectedToken._id);
-        
+    const findShifterData = (tokenObj, silent = false) => {
+        //let tokenObj = getObj(selectedToken._type, selectedToken._id);
+
         //const id = tokenObj.get("represents");
         //const targetId = _.findKey(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], function(s) { return s[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] == id; });
         //if (targetKey)
@@ -519,10 +535,10 @@ var WildShape = WildShape || (function() {
                     shifterControlledby: targetCharacter.get("controlledby")
                 };
             }
-            else
+            else if (!silent)
                 UTILS.chatError("Cannot find ShapeShifter: " + targetId + ", character id: " + target[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID]);
         }
-        else
+        else if (!silent)
             UTILS.chatError("Cannot find ShapeShifter: " + targetId);
 
         return null;
@@ -550,7 +566,7 @@ var WildShape = WildShape || (function() {
         return img;
     }
 
-    async function getCharacterData(shiftData, isNpc, isDefault) {
+    async function getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
         const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
@@ -567,7 +583,7 @@ var WildShape = WildShape || (function() {
         let senses = null;
 
         // setup token data
-        if(isNpc)
+        if(isTargetNpc)
         {
             hpName      = config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP];
             acName      = config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC];
@@ -669,7 +685,7 @@ var WildShape = WildShape || (function() {
                     senses[attr] = config[WS_API.FIELDS.SENSES.ROOT][attr];
                 });
 
-                if (isNpc)
+                if (isTargetNpc)
                 {
                     // get npc senses
                     let targetSenses = getAttrByName(shiftData.targetCharacterId, config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES]);
@@ -699,7 +715,7 @@ var WildShape = WildShape || (function() {
         // special handling of NPC ShapeShifter to restore hp when going back to original form, as they don't store the current in hp
         if(shifterSettings[WS_API.FIELDS.ISNPC])
         {
-            if (isDefault)
+            if (isTargetDefault)
             {
                 if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
                 {
@@ -771,7 +787,7 @@ var WildShape = WildShape || (function() {
         }
 
         let targetData = null;
-        await getCharacterData(shiftData, isTargetNpc, isTargetDefault).then((ret) => { targetData = ret; });
+        await getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault).then((ret) => { targetData = ret; });
         if (!targetData)
             return false;
 
@@ -952,26 +968,26 @@ var WildShape = WildShape || (function() {
             return;
         }
 
-        const shifterName = args.shift();
         const shapeName = args.shift();
 
-        const obj = findShifterData(msg.selected[0]);
+        const tokenObj = getObj(msg.selected[0]._type, msg.selected[0]._id);
+        const obj = findShifterData(tokenObj);
         if(obj)
         {
             // check that the player sending the command can actually control the token
             if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
             {
                 obj.who = msg.who;
-                obj.targetShapeName = shapeName.toLowerCase();
+                obj.targetShapeName = shapeName;
 
                 if (obj.targetShapeName !== obj.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.CURRENT_SHAPE])
                 {
                     if (obj.targetShapeName != WS_API.DEFAULTS.BASE_SHAPE)
                     {
-                        obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][shapeName];
+                        obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][obj.targetShapeName];
                         if (!obj.targetShape)
                         {
-                            UTILS.chatErrorToPlayer(msg.who, "Cannot find shape [" + shapeName + "] for ShapeShifter: " + obj.shifterId);
+                            UTILS.chatErrorToPlayer(msg.who, "Cannot find shape [" + obj.targetShapeName + "] for ShapeShifter: " + obj.shifterId);
                             return;
                         }
                     }
@@ -1552,7 +1568,8 @@ var WildShape = WildShape || (function() {
                     return;
                 }
 
-                const obj = findShifterData(msg.selected[0]);
+                const tokenObj = getObj(msg.selected[0]._type, msg.selected[0]._id);
+                const obj = findShifterData(tokenObj);
                 if (obj)
                 {
                     if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
@@ -1660,19 +1677,27 @@ var WildShape = WildShape || (function() {
         }
     };
 
-    const copySenses = (from, to) =>
+    const handleAddToken = (token) => 
     {
-        const fromSenses = from[WS_API.FIELDS.SENSES.ROOT];        
-        let toSenses = {};
-
-        _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, function (attr)
+        let obj = findShifterData(token, true);
+        if(obj)
         {
-            toSenses[attr] = fromSenses[attr];
-        });
+            let shifterSettings = obj.shifter[WS_API.FIELDS.SETTINGS];
+            obj.who = "gm";
+            obj.targetShapeName = shifterSettings[WS_API.FIELDS.CURRENT_SHAPE];
+            if (obj.targetShapeName != WS_API.DEFAULTS.BASE_SHAPE)
+            {
+                obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][obj.targetShapeName];
+                if (!obj.targetShape)
+                {
+                    UTILS.chatError("Cannot find shape [" + obj.targetShapeName + "] for ShapeShifter: " + obj.shifterId);
+                    return;
+                }
 
-        toSenses[WS_API.FIELDS.SENSES.OVERRIDE] = fromSenses[WS_API.FIELDS.SENSES.OVERRIDE];
-        to[WS_API.FIELDS.SENSES.ROOT] = toSenses;
-    }; 
+                doShapeShift(obj);
+            }
+        }
+    };
 
     const upgradeVersion = () => {
         const currentVersion = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
@@ -1680,12 +1705,9 @@ var WildShape = WildShape || (function() {
 
         let config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         let shifters = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS];
-        let upgradeLog = [];
 
         if (UTILS.compareVersion(currentVersion, "1.0.2") < 0)
         {
-            upgradeLog.push("1.0.2");
-
             const npcFields = WS_API.FIELDS.NPC_DATA;
             config[npcFields.ROOT] = {};
             config[npcFields.ROOT][npcFields.HP_CACHE] = newConfig[npcFields.ROOT][npcFields.HP_CACHE];
@@ -1702,8 +1724,6 @@ var WildShape = WildShape || (function() {
 
         if (UTILS.compareVersion(currentVersion, "1.0.4") < 0)
         {
-            upgradeLog.push("1.0.4");
-
             // add MAKEROLLPUBLIC field to shifters, default to true for non-npcs
             _.each(shifters, (value, shifterId) => {
                 let shifterSettings = shifters[shifterId][WS_API.FIELDS.SETTINGS];
@@ -1713,8 +1733,6 @@ var WildShape = WildShape || (function() {
 
         if (UTILS.compareVersion(currentVersion, "1.0.5") < 0)
         {
-            upgradeLog.push("1.0.5");
-
             // updated separator to minimize collisions with names/strings
             if(config.SEP == "--")
                 config.SEP = newConfig.SEP;
@@ -1722,8 +1740,6 @@ var WildShape = WildShape || (function() {
 
         if (UTILS.compareVersion(currentVersion, "1.0.6") < 0)
         {
-            upgradeLog.push("1.0.6");
-
             // copy defaults in config
             copySenses(newConfig, config);
 
@@ -1744,18 +1760,14 @@ var WildShape = WildShape || (function() {
 
         if (UTILS.compareVersion(currentVersion, "1.0.7") < 0)
         {
-            upgradeLog.push("1.0.7");
             config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] = newConfig[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES];
         }
 
         config.VERSION = WS_API.VERSION;
-
-        return upgradeLog.length > 0 ? upgradeLog : null;
     };
 
     const setDefaults = (reset) => {
         let oldVersionDetected = null;
-        let upgradeLog = null;
 
         if(!state[WS_API.STATENAME] || typeof state[WS_API.STATENAME] !== 'object' || reset)
         {
@@ -1772,7 +1784,7 @@ var WildShape = WildShape || (function() {
         else if (UTILS.compareVersion(state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION, WS_API.VERSION) < 0)
         {
             oldVersionDetected = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
-            upgradeLog = upgradeVersion();
+            upgradeVersion();
         }
 
         if (!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] || typeof state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] !== 'object' || reset)
@@ -1788,16 +1800,13 @@ var WildShape = WildShape || (function() {
 
             if (oldVersionDetected)
             {
-                if (upgradeLog)
-                {
-                    _.each(upgradeLog, function (version) {
-                        UTILS.chat("Upgraded to " + version + ": " + WS_API.CHANGELOG[version]);
+                _.each(WS_API.CHANGELOG, function (changes, version) 
+                    {
+                        if (UTILS.compareVersion(oldVersionDetected, version) < 0)
+                            UTILS.chat("Updated to " + version + ": " + changes);
                     });
 
-                    UTILS.chat("New version detected, upgraded from " + oldVersionDetected + " to " + WS_API.VERSION);
-                }
-                else
-                    UTILS.chat("New version detected: " + WS_API.VERSION);
+                UTILS.chat("New version detected, updated from " + oldVersionDetected + " to " + WS_API.VERSION);
             }
         }
     };
@@ -1814,6 +1823,11 @@ var WildShape = WildShape || (function() {
 
         // register event handlers
         on('chat:message', handleInput);
+        on('add:token', function (t) {
+            _.delay(() => {
+                handleAddToken(t);
+            }, 100);
+        });
 
         log(WS_API.NAME + ' Ready!');
         UTILS.chat("API Ready, command: " + WS_API.CMD.ROOT);
