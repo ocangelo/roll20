@@ -1,12 +1,3 @@
-/*
-
-importing a monster from the MonsterManual:
-- open the monster, make a copy, and download its avatar 
-- re-add the image to the library
-- set the image from the library as the copied monster avatar
-
-*/
-
 /*jshint -W069 */
 /*jshint -W014 */
 
