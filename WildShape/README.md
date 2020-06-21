@@ -17,7 +17,7 @@ After that you can copy the main WildShape script: https://github.com/ocangelo/r
     * show journal entries to players for all their shapes
     * change the token to the last taken shape when dropping a new shifter token (e.g. from the journal or copy/paste, useful when moving between maps)
 * shapes can be mass imported from a journal folder
-* i've tried to make most things configurable so that if you don't like a setting you should be able to easily change it, if not just shoot me a message and i will see what i can do
+* i've tried to make most things configurable so that if you don't like a setting you should be able to easily change it through a chat menu, if not just shoot me a message and i will see what i can do
 
 # Usage
 With a token selected both the GM and the player that controls that token can run **!ws** to be presented with a list of all available shapes, just click on an entry to trigger the shapeshift (the GM will have an additional "edit" shown on top as a shortcut).
