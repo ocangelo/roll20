@@ -8,14 +8,14 @@ After that you can copy the main WildShape script: https://github.com/ocangelo/r
 # Main features
 * can be used for both PC and NPC to shape shift into either a PC or an NPC
 * alt-double clicking on the "shape shifted" token will open the relative pc/npc sheet so that you can run actions from your new shape
-* automatically copy INT/WIS/CHA attributes for druids to NPCs
-* automatically change the token size
-* automatically set hp/ac/speed on bar1/2/3 when you shapeshift
-* automatically setup senses (e.g. light, vision) from darkvision/blindsight info on NPCs, can set defaults and overrides per shape
-* automatically show journal entries to players for all their shapes
-* automatically change roll settings on NPC sheet (when transforming from a PC) to never whisper, toggle advantage, don't autoroll damage
+* automatically:
+    * copy INT/WIS/CHA attributes for druids to NPCs
+    * change the token size
+    * set hp/ac/speed on bar1/2/3 when you shapeshift
+    * setup senses (e.g. light, vision) from darkvision/blindsight info on NPCs, can set defaults and overrides per shape
+    * change roll settings on NPC sheet (when transforming from a PC) to never whisper, toggle advantage, don't autoroll damage
+    * show journal entries to players for all their shapes
 * shapes can be mass imported from a journal folder
-
 * i've tried to make most things configurable so that if you don't like a setting you should be able to easily change it, if not just shoot me a message and i will see what i can do
 
 # Usage
