@@ -15,6 +15,7 @@ After that you can copy the main WildShape script: https://github.com/ocangelo/r
     * setup senses (e.g. light, vision) from darkvision/blindsight info on NPCs, can set defaults and overrides per shape
     * change roll settings on NPC sheet (when transforming from a PC) to never whisper, toggle advantage, don't autoroll damage
     * show journal entries to players for all their shapes
+    * change the token to the last taken shape when dropping a new shifter token (e.g. from the journal or copy/paste, useful when moving between maps)
 * shapes can be mass imported from a journal folder
 * i've tried to make most things configurable so that if you don't like a setting you should be able to easily change it, if not just shoot me a message and i will see what i can do
 
@@ -45,7 +46,6 @@ For instance if you have 2 PCs and 1 NPC being able to transform into a "Giant T
 
 # Wishlist
 Things i would like to add in future if i have time:
-* when dropping a new shifter token (e.g. from the journal) automatically change the token to the current shape (useful when moving between maps)
 * some sort of categorization to the shape list, maybe player-created so they can split/organize the list shown when they try to shapeshift in any way they want (right now it's alphabetical)
 * see if i can copy saves/skills/proficiencies from druids to npcs
 * adding some sort of json import/export for shifters and/or shape lists
