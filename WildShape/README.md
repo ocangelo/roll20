@@ -64,7 +64,7 @@ One available feature is to automatically write senses (vision, light, etc.) to 
 
 The API will automatically grab the "darkvision" and "blindsight" values from the NPC Data "SENSES" attribute and set them as dim/bright light radius; you can also force different senses data per shape/shifter if you need to do so (useful to define the base darkvision settings for your elf druid when he/she transforms to the default shape for instance).
 
-In the main menu you can enable/disable the feature and set the defaults in case the data cannot be retried and the values are not overridden at the shape/shifter level.
+In the main menu you can enable/disable the feature and set the defaults in case the data cannot be retrieved and the values are not overridden at the shape/shifter level.
 
 ![9-writeSenses](https://github.com/ocangelo/roll20/blob/master/WildShape/images/9-writeSenses.JPG)
 
