@@ -1,13 +1,14 @@
 /*jshint -W069 */
 /*jshint -W014 */
+/*jshint -W083 */
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.1",
-    REQUIRED_HELPER_VERSION: "1.0",
+    VERSION : "1.1.1",
+    REQUIRED_HELPER_VERSION: "1.1",
 
     STATENAME : "WILDSHAPE",
-    DEBUG : false,
+    DEBUG : true,
 
     // storage in the state
     DATA_CONFIG : "config",
@@ -734,29 +735,105 @@ var WildShape = WildShape || (function() {
         return data;
     }
 
+    const copyDruidProficiency = (fromId, toId, fromStat, toStat) => {
+        /*
+        You also retain all of your skill and saving throw Proficiencies, in addition to gaining those of the creature. 
+        If the creature has the same proficiency as you and the bonus in its stat block is higher than yours, use the creature’s bonus instead of yours. 
+        */
+
+        const SUFFIX_PROF   = "_prof";
+        const SUFFIX_BONUS  = "_bonus";
+        const SUFFIX_FLAG   = "_flag";
+        const SUFFIX_BASE   = "_save";
+
+        UTILS.chat("check prof: " + fromStat + SUFFIX_PROF);
+        if (UTILS.isProficient(fromId, fromStat + SUFFIX_PROF))
+        {
+            UTILS.chat("prof: yes");
+
+            let pc_attr  = findObjs({_type: "attribute", name: fromStat + SUFFIX_BONUS, _characterid: fromId})[0];
+            let npc_attr = findObjs({_type: "attribute", name: toStat, _characterid: toId})[0];
+            if (pc_attr && npc_attr)
+            {
+                UTILS.chat("attr: yes");
+                let npc_attr_flag = findObjs({_type: "attribute", name: toStat + SUFFIX_FLAG, _characterid: toId})[0];
+                if (npc_attr_flag)
+                {
+                    UTILS.chat("flag: yes");
+                    npc_attr_flag.set("current", 1);
+                }
+
+                const pc_val = Number(pc_attr.get("current"));
+                const npc_val = Number(npc_attr.get("current"));
+                UTILS.chat("pc val: " + pc_val + " npc val: " + npc_val);
+                if (pc_val > npc_val)
+                {
+                    UTILS.chat("set: yes");
+
+                    npc_attr.set("current", pc_val);
+                    npc_attr = findObjs({_type: "attribute", name: toStat + SUFFIX_BASE, _characterid: toId})[0];
+                    if (npc_attr)
+                    {
+                        UTILS.chat("base: yes");
+                        npc_attr.set("current", (pcVal > 0 ? "+" : "-") + pcVal.toString());
+                    }
+                }
+            }
+        }
+    };
+
     const copyDruidData = (fromId, toId) => {
+        // copy attributes
         const copyAttrNames = ["intelligence", "wisdom", "charisma"];
         const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"];
 
         _.each(copyAttrNames, function (attrName) {
             _.each(copyAttrVariations, function (attrVar) {
-                UTILS.copyAttribute(fromId, toId, attrName + attrVar, "", "", false);
+                UTILS.copyAttribute(fromId, attrName + attrVar, toId, attrName + attrVar, false);
             });
         });
 
-        /* copy skill proficiencies?
-                //npc_saving_flag: 1
-                // npc_str/dex/con/wis/int/cha_save + _flag
+        // copy proficiencies       
+        const NPC_STATS = ["str", "dex", "con", "int", "wis", "cha"];
+        const PC_STATS = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
+        const SKILLS = {
+            "str" : [ "athletics"], 
+            "dex" : [ "acrobatics", "sleight_of_hand", "stealth"],
+            "con" : [],
+            "int" : [ "arcana", "history", "investigation", "nature", "religion"],
+            "wis" : [ "animal_handling", "insight", "medicine", "perception", "survival"],
+            "cha" : [ "deception", "intimidation", "performance", "persuasion"]
+        };
 
-                copyAttrNames = ["acrobatics", "animal_handling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", 
-                                 "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleight_of_hand", "stealth", "survival"];
-                copyAttrVariations = ["_prof"]
-                _.each(copyAttrNames, function (attrName) {
-                    _.each(copyAttrVariations, function (attrVar) {
-                        copyDruidAttribute(targetCharacterId, attrName + attrVar);
-                    });
-                });
-        */
+        const PREFIX_NPC    = "npc_";
+        const SUFFIX_SAVE   = "_save";
+
+        for (let statIndex = 1; statIndex <= 6; ++statIndex)
+        {
+            let pc_stat = PC_STATS[statIndex];
+            let npc_stat = NPC_STATS[statIndex];
+
+            // copy save proficiency
+            copyDruidProficiency(fromId, toId, pc_stat + SUFFIX_SAVE, PREFIX_NPC + npc_stat + SUFFIX_SAVE);
+
+            // copy skill proficiency for all skills associated with this stat
+            _.each(SKILLS[npc_stat], (skill) => {
+                copyDruidProficiency(fromId, toId, skill, PREFIX_NPC + skill);
+            });
+        }
+
+        // npc saving/skills flag
+        let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: toId})[0];
+        if (npc_attr_flag)
+        {
+            npc_attr_flag.set("current", 1);
+        }
+
+        npc_attr_flag = findObjs({_type: "attribute", name: "npc_skills_flag", _characterid: toId})[0];
+        if (npc_attr_flag)
+        {
+            npc_attr_flag.set("current", 1);
+        }
     };
 
     async function doShapeShift(shiftData) {
@@ -1815,7 +1892,7 @@ var WildShape = WildShape || (function() {
         // check install
         if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
         {
-            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelper script");
+            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelpers script");
             return;
         }
 

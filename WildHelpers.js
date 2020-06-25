@@ -3,7 +3,7 @@
 class WildUtils {
     constructor(apiName) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.0";
+        this.VERSION = "1.1";
     }
 
     chat(msg, callback = null, settings = {noarchive:true}) {
@@ -97,14 +97,7 @@ class WildUtils {
         }
     }
 
-    copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
-        if(!toPrefix)
-            toPrefix = "";
-        if(!toSuffix)
-            toSuffix = "";
-
-        const toAttrName = toPrefix + fromAttrName + toSuffix;
-
+    copyAttribute(fromId, fromAttrName, toId, toAttrName, onlyIfGreater = true, createAttr = false) {
         let fromAttr = getAttrByName(fromId, fromAttrName);
         let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
@@ -124,6 +117,18 @@ class WildUtils {
         }
         else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
             toAttr.set("current", fromAttr);
+    }
+
+    isProficient(charId, attrName) {
+        let attr = findObjs({_type: "attribute", name: attrName, _characterid: charId})[0];
+        if(attr)
+        {
+            attr = attr.get("current");
+
+            return attr && attr.indexOf("@{pb}") >=0;
+        }
+
+        return false;
     }
 
     getCharactersWithAttr(attributeName) {
