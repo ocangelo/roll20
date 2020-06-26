@@ -1,9 +1,15 @@
 /*jshint -W083 */
 
 class WildUtils {
-    constructor(apiName) {
+    constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
         this.VERSION = "1.1";
+        this.DEBUG = isDebug;
+    }
+
+    debugChat(msg) {
+        if (this.DEBUG)
+            sendChat(this.APINAME, "/w gm " + msg, null, {noarchive:true});
     }
 
     chat(msg, callback = null, settings = {noarchive:true}) {

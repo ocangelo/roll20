@@ -163,6 +163,8 @@ const WS_API = {
     }
 };
 
+// ========================================= MENU HANDLING =========================================
+
 class WildShapeMenu extends WildMenu
 {
     constructor() {
@@ -180,7 +182,7 @@ class WildShapeMenu extends WildMenu
         this.CMD.CONFIG_EDIT     = this.CMD.CONFIG + this.SEP + WS_API.CMD.EDIT + this.SEP;
         this.CMD.CONFIG_RESET    = this.CMD.CONFIG + this.SEP + WS_API.CMD.RESET;
 
-        this.UTILS = new WildUtils(WS_API.NAME);
+        this.UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
         this.SHAPE_SIZES = WS_API.SHAPE_SIZES.join("|");
     }
 
@@ -477,11 +479,12 @@ class WildShapeMenu extends WildMenu
     }
 }
 
+// ========================================= WILD SHAPE =========================================
 
 var WildShape = WildShape || (function() {
     'use strict';
     let MENU = new WildShapeMenu();
-    let UTILS = new WildUtils(WS_API.NAME);
+    let UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
 
     const sortShifters = () => {
         // order shifters
@@ -551,12 +554,7 @@ var WildShape = WildShape || (function() {
         // get token image
         character.get('defaulttoken', function(defaulttoken) {
             const dt = JSON.parse(defaulttoken);
-            if (dt)
-            {
-                img = UTILS.getCleanImgsrc(dt.imgsrc);
-            }
-            else
-                img = "";
+            img = dt ? UTILS.getCleanImgsrc(dt.imgsrc) : "";
         });
 
         while (img == null)
@@ -735,7 +733,7 @@ var WildShape = WildShape || (function() {
         return data;
     }
 
-    const copyDruidProficiency = (fromId, toId, fromStat, toStat) => {
+    const copyDruidProficiency = (druidId, shapeId, fromStat, toStat, fromPb, npcMod) => {
         /*
         You also retain all of your skill and saving throw Proficiencies, in addition to gaining those of the creature. 
         If the creature has the same proficiency as you and the bonus in its stat block is higher than yours, use the creature’s bonus instead of yours. 
@@ -744,92 +742,113 @@ var WildShape = WildShape || (function() {
         const SUFFIX_PROF   = "_prof";
         const SUFFIX_BONUS  = "_bonus";
         const SUFFIX_FLAG   = "_flag";
-        const SUFFIX_BASE   = "_save";
+        const SUFFIX_BASE   = "_base";
+        const SUFFIX_MOD    = "_mod";
 
-        UTILS.chat("check prof: " + fromStat + SUFFIX_PROF);
-        if (UTILS.isProficient(fromId, fromStat + SUFFIX_PROF))
+        if (UTILS.isProficient(druidId, fromStat + SUFFIX_PROF))
         {
-            UTILS.chat("prof: yes");
+            UTILS.debugChat("found proficiency in: " + fromStat);
 
-            let pc_attr  = findObjs({_type: "attribute", name: fromStat + SUFFIX_BONUS, _characterid: fromId})[0];
-            let npc_attr = findObjs({_type: "attribute", name: toStat, _characterid: toId})[0];
-            if (pc_attr && npc_attr)
+            let npcAttr = findObjs({_type: "attribute", name: toStat, _characterid: shapeId})[0];
+            if (npcAttr)
             {
-                UTILS.chat("attr: yes");
-                let npc_attr_flag = findObjs({_type: "attribute", name: toStat + SUFFIX_FLAG, _characterid: toId})[0];
-                if (npc_attr_flag)
-                {
-                    UTILS.chat("flag: yes");
-                    npc_attr_flag.set("current", 1);
-                }
+                // replace proficiency bonus if greater
+                let npcAttrValue = npcAttr.get("current");
+                npcAttrValue = npcAttrValue && npcAttrValue !== "" ? Number(npcAttrValue) : 0;
 
-                const pc_val = Number(pc_attr.get("current"));
-                const npc_val = Number(npc_attr.get("current"));
-                UTILS.chat("pc val: " + pc_val + " npc val: " + npc_val);
-                if (pc_val > npc_val)
-                {
-                    UTILS.chat("set: yes");
+                const npcPb = npcAttrValue - npcMod;
 
-                    npc_attr.set("current", pc_val);
-                    npc_attr = findObjs({_type: "attribute", name: toStat + SUFFIX_BASE, _characterid: toId})[0];
-                    if (npc_attr)
+                UTILS.debugChat("-- npc " + fromStat + " pb: " + npcPb + ", mod " + npcMod);
+                if (fromPb > npcPb)
+                {
+                    const newNpcAttrValue = npcAttrValue - npcPb + fromPb;
+                    npcAttr.set("current", newNpcAttrValue);
+
+                    UTILS.debugChat("-- changing value: " + npcAttrValue.toString() + " to " + newNpcAttrValue.toString());                  
+
+                    // also set _base value
+                    npcAttr = findObjs({_type: "attribute", name: toStat + SUFFIX_BASE, _characterid: shapeId})[0];
+                    if (npcAttr)
                     {
-                        UTILS.chat("base: yes");
-                        npc_attr.set("current", (pcVal > 0 ? "+" : "-") + pcVal.toString());
+                        UTILS.debugChat("-- setting base value");
+                        npcAttr.set("current", (newNpcAttrValue > 0 ? "+" : "-") + newNpcAttrValue.toString());
                     }
                 }
+
+
+                // set _flag value so that skills are displayed on NPCs
+                npcAttr = findObjs({_type: "attribute", name: toStat + SUFFIX_FLAG, _characterid: shapeId})[0];
+                if (npcAttr)
+                {
+                    UTILS.debugChat("-- setting flag value");
+                    npcAttr.set("current", 1);
+                }  
             }
         }
     };
 
-    const copyDruidData = (fromId, toId) => {
+    const copyDruidData = (druidId, shapeId) => {
         // copy attributes
+        UTILS.debugChat("copying attributes");
         const copyAttrNames = ["intelligence", "wisdom", "charisma"];
         const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"];
 
         _.each(copyAttrNames, function (attrName) {
             _.each(copyAttrVariations, function (attrVar) {
-                UTILS.copyAttribute(fromId, attrName + attrVar, toId, attrName + attrVar, false);
+                UTILS.copyAttribute(druidId, attrName + attrVar, shapeId, attrName + attrVar, false);
             });
         });
 
-        // copy proficiencies       
-        const NPC_STATS = ["str", "dex", "con", "int", "wis", "cha"];
+        // copy proficiencies
+        UTILS.debugChat("copying proficiencies");
+
+        const PC_PROF_STAT = "pb";
         const PC_STATS = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
+        const NPC_STATS = ["str", "dex", "con", "int", "wis", "cha"];
+
         const SKILLS = {
-            "str" : [ "athletics"], 
-            "dex" : [ "acrobatics", "sleight_of_hand", "stealth"],
-            "con" : [],
-            "int" : [ "arcana", "history", "investigation", "nature", "religion"],
-            "wis" : [ "animal_handling", "insight", "medicine", "perception", "survival"],
-            "cha" : [ "deception", "intimidation", "performance", "persuasion"]
+            "strength" : [ "athletics"], 
+            "dexterity" : [ "acrobatics", "sleight_of_hand", "stealth"],
+            "constitution" : [],
+            "intelligence" : [ "arcana", "history", "investigation", "nature", "religion"],
+            "wisdom" : [ "animal_handling", "insight", "medicine", "perception", "survival"],
+            "charisma" : [ "deception", "intimidation", "performance", "persuasion"]
         };
 
         const PREFIX_NPC    = "npc_";
         const SUFFIX_SAVE   = "_save";
+        const SUFFIX_MOD    = "_mod";
+
+        // save proficiency bonus
+        let pb  = findObjs({_type: "attribute", name: PC_PROF_STAT, _characterid: druidId})[0];
+        pb = pb ? Number(pb.get("current")) : 0;
 
         for (let statIndex = 1; statIndex <= 6; ++statIndex)
         {
-            let pc_stat = PC_STATS[statIndex];
-            let npc_stat = NPC_STATS[statIndex];
+            let pcStat = PC_STATS[statIndex];
+            let npcStat = NPC_STATS[statIndex];
+
+            // stat modifier on npc
+            let npcMod = findObjs({_type: "attribute", name: pcStat + SUFFIX_MOD, _characterid: shapeId})[0];
+            npcMod = npcMod ? Number(npcMod.get("current")) : 0;
 
             // copy save proficiency
-            copyDruidProficiency(fromId, toId, pc_stat + SUFFIX_SAVE, PREFIX_NPC + npc_stat + SUFFIX_SAVE);
+            copyDruidProficiency(druidId, shapeId, pcStat + SUFFIX_SAVE, PREFIX_NPC + npcStat + SUFFIX_SAVE, pb, npcMod);
 
             // copy skill proficiency for all skills associated with this stat
-            _.each(SKILLS[npc_stat], (skill) => {
-                copyDruidProficiency(fromId, toId, skill, PREFIX_NPC + skill);
+            _.each(SKILLS[pcStat], (skill) => {
+                copyDruidProficiency(druidId, shapeId, skill, PREFIX_NPC + skill, pb, npcMod);
             });
         }
 
         // npc saving/skills flag
-        let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: toId})[0];
+        let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: shapeId})[0];
         if (npc_attr_flag)
         {
             npc_attr_flag.set("current", 1);
         }
 
-        npc_attr_flag = findObjs({_type: "attribute", name: "npc_skills_flag", _characterid: toId})[0];
+        npc_attr_flag = findObjs({_type: "attribute", name: "npc_skills_flag", _characterid: shapeId})[0];
         if (npc_attr_flag)
         {
             npc_attr_flag.set("current", 1);
@@ -870,13 +889,15 @@ var WildShape = WildShape || (function() {
 
         if (WS_API.DEBUG)
         {
-            UTILS.chat("====== TARGET STATS ======");
-            UTILS.chat("token_size = " + targetData.tokenSize);
-            UTILS.chat("controlledby = " + targetData.controlledby);
-            UTILS.chat("avatar = " + targetData.imgsrc);
-            UTILS.chat("hp = " + (targetData.hp ? targetData.hp.current : "invalid"));
-            UTILS.chat("ac = " + (targetData.ac ? targetData.ac.current : "invalid"));
-            UTILS.chat("npc speed = " + (targetData.speed ? targetData.speed.current : "invalid"));
+            let debugStats = ""
+                + ("====== TARGET STATS ======")
+                + ("<br>token_size = " + targetData.tokenSize)
+                + ("<br>controlledby = " + targetData.controlledby)
+                + ("<br>avatar = " + targetData.imgsrc)
+                + ("<br>hp = " + (targetData.hp ? targetData.hp.current : "invalid"))
+                + ("<br>ac = " + (targetData.ac ? targetData.ac.current : "invalid"))
+                + ("<br>npc speed = " + (targetData.speed ? targetData.speed.current : "invalid"));
+            UTILS.debugChat(debugStats);
         }
 
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
