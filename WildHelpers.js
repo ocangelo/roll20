@@ -104,7 +104,14 @@ class WildUtils {
     }
 
     copyAttribute(fromId, fromAttrName, toId, toAttrName, onlyIfGreater = true, createAttr = false) {
-        let fromAttr = getAttrByName(fromId, fromAttrName);
+        let fromAttr = findObjs({type: 'attribute', characterid: fromId, name: fromAttrName})[0];
+        if (!fromAttr)
+        {
+            this.chatError("Cannot find attribute " + fromAttrName + " on character " + fromId);
+            return;
+        }
+
+        let fromAttrCurrent = fromAttr.get("current");
         let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
             if(createAttr)
@@ -112,8 +119,8 @@ class WildUtils {
                 createObj('attribute', {
                     characterid: toId,
                     name: toName,
-                    current: fromAttr,
-                    max: fromAttr
+                    current: fromAttrCurrent,
+                    max: fromAttr.get("max")
                 });
             }
             else
@@ -121,8 +128,8 @@ class WildUtils {
                 this.chatError("Cannot find attribute " + toAttrName + " on character " + toId);
             }
         }
-        else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
-            toAttr.set("current", fromAttr);
+        else if(!onlyIfGreater || toAttr.get("current") < fromAttrCurrent)
+            toAttr.set("current", fromAttrCurrent);
     }
 
     isProficient(charId, attrName) {
