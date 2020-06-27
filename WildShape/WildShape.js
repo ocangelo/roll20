@@ -4,7 +4,7 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.2",
+    VERSION : "1.2.1",
     REQUIRED_HELPER_VERSION: "1.1",
 
     STATENAME : "WILDSHAPE",
@@ -1515,46 +1515,54 @@ var WildShape = WildShape || (function() {
                         let newValue = args.shift();
                         if(field == WS_API.FIELDS.CHARACTER)
                         {
-                            let shapeObj = findObjs({ type: 'character', name: newValue })[0];
-                            if(shapeObj)
+                            // if we are renaming the shapeKey as well we need to make sure the new value won't point to an existing shape
+                            const oldCharacterName = shape[field];
+                            if (oldCharacterName !== shapeKey || !shifter[WS_API.FIELDS.SHAPES][newValue.trim()])
                             {
-                                // clear old shape data
-                                const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                                if (oldShapeCharacter)
+                                let shapeObj = findObjs({ type: 'character', name: newValue })[0];
+                                if(shapeObj)
                                 {
-                                    oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                    // clear old shape data
+                                    const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+                                    if (oldShapeCharacter)
+                                    {
+                                        oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                    }
+
+                                    // set new shape data
+                                    const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
+                                    if (shifterCharacter)
+                                    {
+                                        const shifterControlledBy = shifterCharacter.get("controlledby");
+                                        shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                                    }
+
+                                    shape[field] = newValue;
+                                    isValueSet = true;
+                                   
+                                    // set new shape id
+                                    shape[WS_API.FIELDS.ID] = shapeObj.get('id');
+                                    
+                                    // cache stats on the new shape
+                                    cacheCharacterData(shape);
+
+				    // also rename key if the name matches
+                                    if (oldCharacterName == shapeKey)
+                                    {
+                                        field = WS_API.FIELDS.NAME;
+                                    }
                                 }
-
-                                // set new shape data
-                                const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
-                                if (shifterCharacter)
+                                else
                                 {
-                                    const shifterControlledBy = shifterCharacter.get("controlledby");
-                                    shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
-                                }
-
-                                const oldCharacterName = shape[field];
-                                shape[field] = newValue;
-                                isValueSet = true;
-                               
-                                // set new shape id
-                                shape[WS_API.FIELDS.ID] = shapeObj.get('id');
-                                
-
-                                // cache stats on the new shape
-                                cacheCharacterData(shape);
-
-                                // also rename key if the name matches
-                                if (oldCharacterName == shapeKey)
-                                {
-                                    field = WS_API.FIELDS.NAME;
+                                    UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
                                 }
                             }
                             else
                             {
-                                UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                                UTILS.chatError("Trying to add shape " + newValue + " which already exists");
+                                return;
                             }
-                        }                                                            
+                        }
 
                         if(field == WS_API.FIELDS.NAME)
                         {
@@ -1572,6 +1580,7 @@ var WildShape = WildShape || (function() {
                                 else
                                 {
                                     UTILS.chatError("Trying to add shape " + shapeKey + " which already exists");
+                                    shapeKey = oldShapeKey;
                                 }
                             }
                         }
