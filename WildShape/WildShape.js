@@ -1,10 +1,11 @@
 /*jshint -W069 */
 /*jshint -W014 */
+/*jshint -W083 */
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.1",
-    REQUIRED_HELPER_VERSION: "1.0",
+    VERSION : "1.2",
+    REQUIRED_HELPER_VERSION: "1.1",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -14,58 +15,88 @@ const WS_API = {
     DATA_SHIFTERS : "shifters",
 
     // general info
-    DEFAULTS : {
+    SETTINGS : {
         BASE_SHAPE : "base",
         SHIFTER_SIZE : "normal",
-        SHAPE_SIZE : "auto",
+        SHAPE_SIZE : "auto",        
+        SHAPE_SIZES : [
+            "auto",
+            "normal",
+            "large",
+            "huge",
+            "gargantuan",
+        ],
 
-        CONFIG : {
-            SEP: "###",              // separator used in commands
-
-            PC_DATA : {
-                HP: "hp",
-                AC: "ac",
-                SPEED: "speed",
+        STATS: {
+            NAMES: ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+            SHORT_NAMES: ["str", "dex", "con", "int", "wis", "cha"],
+            SKILLS: {
+                "strength" : [ "athletics"], 
+                "dexterity" : [ "acrobatics", "sleight_of_hand", "stealth"],
+                "constitution" : [],
+                "intelligence" : ["arcana", "history", "investigation", "nature", "religion"],
+                "wisdom" : ["animal_handling", "insight", "medicine", "perception", "survival"],
+                "charisma" : ["deception", "intimidation", "performance", "persuasion"]
             },
 
-            NPC_DATA : {
-                HP_CACHE: "npcCachedHp",
-                SENSES_CACHE: "npcCachedSenses",
-                HP: "hp",
-                AC: "npc_ac",
-                SPEED: "npc_speed",
-                SENSES: "npc_senses",
+            PROF: "pb",
+
+            PREFIX: {
+                NPC: "npc_",
             },
 
-            TOKEN_DATA : {
-                HP: "bar1",         // HP can never be empty, we are caching current value from bars on transforming
-                AC: "bar2",
-                SPEED: "bar3",
-
-                EMPTYBAR: "none",
+            SUFFIX: {
+                BASE:       "_base",
+                MOD:        "_mod",
+                BONUS:      "_bonus",
+                SAVE:       "_save",
+                SAVE_BONUS: "_save_bonus",
+                PROF:       "_prof",
+                FLAG:       "_flag",
             },
 
-            SENSES: {
-                OVERRIDE_SENSES: true,
-
-                light_radius: 5,
-                light_dimradius: -5,
-                light_otherplayers: false,
-                light_hassight: true,
-                light_angle: 360,
-                light_losangle: 360,
-                light_multiplier: 1, 
-            },
+            DRUID_COPY_ATTR: ["intelligence", "wisdom", "charisma"],
         },
     },
 
-    SHAPE_SIZES : [
-        "auto",
-        "normal",
-        "large",
-        "huge",
-        "gargantuan",
-    ],
+    DEFAULT_CONFIG : {
+        SEP: "###",              // separator used in commands
+
+        PC_DATA : {
+            HP: "hp",
+            AC: "ac",
+            SPEED: "speed",
+        },
+
+        NPC_DATA : {
+            HP_CACHE: "npcCachedHp",
+            HP: "hp",
+            AC: "npc_ac",
+            SPEED: "npc_speed",
+            SENSES: "npc_senses",
+        },
+
+        TOKEN_DATA : {
+            HP: "bar1",         // HP can never be empty, we are caching current value from bars on transforming
+            AC: "bar2",
+            SPEED: "bar3",
+
+            EMPTYBAR: "none",
+        },
+
+        SENSES: {
+            OVERRIDE_SENSES: true,
+
+            light_radius: 5,
+            light_dimradius: -5,
+            light_otherplayers: false,
+            light_hassight: true,
+            light_angle: 360,
+            light_losangle: 360,
+            light_multiplier: 1, 
+        },
+    },
+
 
     // available commands
     CMD : {
@@ -87,7 +118,7 @@ const WS_API = {
         SHOW_SHIFTERS : "showshifters",
     },
 
-    // fields that can be changed by commands
+    // fields that can be referenced by commands
     FIELDS : {
         SEP: "sep",
         TOGGLE: "toggle",
@@ -111,6 +142,14 @@ const WS_API = {
         MAKEROLLPUBLIC: "makerollpublic",
         ISNPC: "isnpc",
         CURRENT_SHAPE: "currshape",
+        
+        STATS_CACHE: {
+            ROOT: "stats_cache",
+            STATS: "stats",
+            MODS: "modifiers",
+            SAVES: "saves",
+            SKILLS: "skills",
+        },
 
         TOKEN_DATA : {
             ROOT: "TOKEN_DATA",
@@ -148,11 +187,12 @@ const WS_API = {
                 "light_angle",
                 "light_losangle",
                 "light_multiplier"],
-        },        
+        },
     },
 
     // major changes
     CHANGELOG : {
+        "1.2"   : "automatically add corrected saving throws and proficiencies for druids",
         "1.1"   : "automatically shapeshift tokens to the last shape when copied/dropped from the journal",
         "1.0.7" : "added senses attribute setting in NPC Data",
         "1.0.6" : "added automatic senses setup for NPCs (e.g. vision, light) and senses overrides for shifters and single shapes",
@@ -161,6 +201,8 @@ const WS_API = {
         "1.0.2" : "restructured pc/npc data",
     }
 };
+
+// ========================================= MENU HANDLING =========================================
 
 class WildShapeMenu extends WildMenu
 {
@@ -179,8 +221,8 @@ class WildShapeMenu extends WildMenu
         this.CMD.CONFIG_EDIT     = this.CMD.CONFIG + this.SEP + WS_API.CMD.EDIT + this.SEP;
         this.CMD.CONFIG_RESET    = this.CMD.CONFIG + this.SEP + WS_API.CMD.RESET;
 
-        this.UTILS = new WildUtils(WS_API.NAME);
-        this.SHAPE_SIZES = WS_API.SHAPE_SIZES.join("|");
+        this.UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
+        this.SHAPE_SIZES = WS_API.SETTINGS.SHAPE_SIZES.join("|");
     }
 
     showEditSenses(shifterId = null, shapeId = null) {
@@ -467,7 +509,7 @@ class WildShapeMenu extends WildMenu
             contents += this.makeButton("Edit", cmdShifterEdit + shifterId, ' width: 100%') + "<hr>";
         }
 
-        contents += this.makeButton(shifterId, cmdShapeShift + WS_API.DEFAULTS.BASE_SHAPE, ' width: 100%') + "<hr>";
+        contents += this.makeButton(shifterId, cmdShapeShift + WS_API.SETTINGS.BASE_SHAPE, ' width: 100%') + "<hr>";
         _.each(shapes, (value, key) => {
             contents += this.makeButton(key, cmdShapeShift + key, ' width: 100%');
         });
@@ -476,11 +518,12 @@ class WildShapeMenu extends WildMenu
     }
 }
 
+// ========================================= WILD SHAPE =========================================
 
 var WildShape = WildShape || (function() {
     'use strict';
     let MENU = new WildShapeMenu();
-    let UTILS = new WildUtils(WS_API.NAME);
+    let UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
 
     const sortShifters = () => {
         // order shifters
@@ -506,8 +549,59 @@ var WildShape = WildShape || (function() {
         to[WS_API.FIELDS.SENSES.ROOT] = toSenses;
     }; 
 
+    // cache basic stats and modifiers
+    const cacheCharacterData = (target) => {
+        const targetId = target[WS_API.FIELDS.ID];
+        const isNpc = (getAttrByName(targetId, 'npc', 'current') == 1);
+
+        const STATS = WS_API.SETTINGS.STATS;
+
+        const PREFIX = isNpc ? STATS.PREFIX.NPC : "";
+        const SUFFIX_MOD = STATS.SUFFIX.MOD;
+        const SUFFIX_SAVE = STATS.SUFFIX.SAVE;
+        const SUFFIX_PROF = STATS.SUFFIX.PROF;
+
+        let stats = {};
+        let mods = {};
+        let saves = {};
+        let skills = {};
+
+        for (let statIndex = 0; statIndex < 6; ++statIndex) {
+            const statName = STATS.NAMES[statIndex];
+            const shortStatName = STATS.SHORT_NAMES[statIndex];
+
+            // copy stat
+            let attr = findObjs({_type: "attribute", name: statName, _characterid: targetId})[0];
+            stats[statName] = attr ? Number(attr.get("current")) : 0;
+
+            // copy modifier
+            attr = findObjs({_type: "attribute", name: statName + SUFFIX_MOD, _characterid: targetId})[0];
+            let mod = attr ? Number(attr.get("current")) : 0;
+            mods[statName] = mod;
+
+            // copy save
+            attr = findObjs({_type: "attribute", name: PREFIX + (isNpc ? shortStatName : statName) + SUFFIX_SAVE, _characterid: targetId})[0];
+            saves[statName] = attr && attr.get("current") != "" ? Number(attr.get("current")) : mod;
+
+            // copy skills
+            _.each(STATS.SKILLS[statName], (skillName) => {
+                attr = findObjs({_type: "attribute", name: PREFIX + skillName, _characterid: targetId})[0];
+                skills[skillName] = attr && attr.get("current") != "" ? Number(attr.get("current")) : mod;
+            });
+        }
+
+        let statsCache = {};
+        statsCache[WS_API.FIELDS.STATS_CACHE.STATS] = stats;
+        statsCache[WS_API.FIELDS.STATS_CACHE.MODS] = mods;
+        statsCache[WS_API.FIELDS.STATS_CACHE.SAVES] = saves;
+        statsCache[WS_API.FIELDS.STATS_CACHE.SKILLS] = skills;
+
+        target[WS_API.FIELDS.STATS_CACHE.ROOT] = statsCache;
+
+    };
+
     const getCreatureSize = (targetSize) => {        
-        return targetSize ? Math.max(_.indexOf(WS_API.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0;
+        return targetSize ? Math.max(_.indexOf(WS_API.SETTINGS.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0;
     };
 
     const findShifterData = (tokenObj, silent = false) => {
@@ -550,12 +644,7 @@ var WildShape = WildShape || (function() {
         // get token image
         character.get('defaulttoken', function(defaulttoken) {
             const dt = JSON.parse(defaulttoken);
-            if (dt)
-            {
-                img = UTILS.getCleanImgsrc(dt.imgsrc);
-            }
-            else
-                img = "";
+            img = dt ? UTILS.getCleanImgsrc(dt.imgsrc) : "";
         });
 
         while (img == null)
@@ -717,14 +806,14 @@ var WildShape = WildShape || (function() {
         {
             if (isTargetDefault)
             {
-                if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.DEFAULTS.BASE_SHAPE)
+                if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] != WS_API.SETTINGS.BASE_SHAPE)
                 {
                     data.hp.current = shifterSettings[config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP_CACHE]];
                 }
                 else
                     return null;
             }
-            else if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.DEFAULTS.BASE_SHAPE)
+            else if (shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.SETTINGS.BASE_SHAPE)
             {
                 // cache current npc hp value
                 shifterSettings[config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP_CACHE]] = shiftData.token.get(config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.HP] + "_value");
@@ -734,29 +823,128 @@ var WildShape = WildShape || (function() {
         return data;
     }
 
-    const copyDruidData = (fromId, toId) => {
-        const copyAttrNames = ["intelligence", "wisdom", "charisma"];
-        const copyAttrVariations = ["", "_base", "_mod", "_save_bonus"];
+    const copyDruidProficiency = (profData) => {
+        /*
+        You also retain all of your skill and saving throw Proficiencies, in addition to gaining those of the creature.
+        If the creature has the same proficiency as you and the bonus in its stat block is higher than yours, use the creature’s bonus instead of yours. 
+        */
+        let shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName, _characterid: profData.shapeId})[0];
+        if (shapeStatAttr)
+        {
+            // target could have proficiency in a stat we don't, default to that proficiency bonus
+            let statPb = profData.shapeStatValue - profData.shapeStatMod;
+            const isProficient = UTILS.isProficient(profData.druidId, profData.druidStatName + WS_API.SETTINGS.STATS.SUFFIX.PROF);
+            UTILS.debugChat("-- stat " + profData.shapeStatName + ": " + profData.shapeStatValue.toString() + ", npc pb: " + statPb + ", npc mod " + profData.shapeStatMod + ", druid pb: " + (isProficient ? profData.druidPb : 0));
 
-        _.each(copyAttrNames, function (attrName) {
-            _.each(copyAttrVariations, function (attrVar) {
-                UTILS.copyAttribute(fromId, toId, attrName + attrVar, "", "", false);
-            });
+            // check which proficiency bonus we should use
+            if (isProficient && profData.druidPb > statPb)
+            {
+                statPb = profData.druidPb;
+            }
+
+            // update stat value based on current modifier and best proficiency
+            const newShapeStatValue = profData.statMod + statPb;
+            const oldShapeStatValue = Number(shapeStatAttr.get("current"));
+            if (newShapeStatValue !== oldShapeStatValue || shapeStatAttr.get("current") == "")
+            {
+                shapeStatAttr.set("current", newShapeStatValue);
+                UTILS.debugChat("-- CHANGING -- " + profData.shapeStatName + " from " + oldShapeStatValue + " to: " + newShapeStatValue.toString());
+
+                // also set _base value
+                shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.BASE, _characterid: profData.shapeId})[0];
+                if (shapeStatAttr)
+                {
+                    shapeStatAttr.set("current", (newShapeStatValue > 0 ? "+" : "") + newShapeStatValue.toString());
+                }                
+            }
+
+            // set _flag value so that stats are forced to be displayed on NPCs
+            shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.FLAG, _characterid: profData.shapeId})[0];
+            if (shapeStatAttr)
+            {
+                shapeStatAttr.set("current", 1);
+            }  
+            }
+        else
+        {
+            UTILS.chatError("cannot find attribute " + profData.shapeStatName + " on shape " + profData.shapeId);
+        }
+    };
+
+    const copyDruidData = (shiftData) => {
+        const STATS = WS_API.SETTINGS.STATS;
+
+        const targetStatsCache = shiftData.targetShape[WS_API.FIELDS.STATS_CACHE.ROOT];
+        const statsCache = targetStatsCache[WS_API.FIELDS.STATS_CACHE.STATS];
+        const modsCache = targetStatsCache[WS_API.FIELDS.STATS_CACHE.MODS];
+        const savesCache = targetStatsCache[WS_API.FIELDS.STATS_CACHE.SAVES];
+        const skillsCache = targetStatsCache[WS_API.FIELDS.STATS_CACHE.SKILLS];
+
+
+        let druidCharacterId = shiftData.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID];
+        
+        let targetCharacterId = shiftData.targetCharacterId;
+        let targetCharacter = shiftData.targetCharacter;
+        let targetShape = shiftData.targetShape;
+
+        // copy attributes
+        UTILS.debugChat("copying druid attributes");
+
+        _.each(STATS.DRUID_COPY_ATTR, function (attrName) {
+            UTILS.copyAttribute(druidCharacterId, attrName, targetCharacterId, attrName, false);
+            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.BASE, targetCharacterId, attrName + STATS.SUFFIX.BASE, false);
+            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.MOD, targetCharacterId, attrName + STATS.SUFFIX.MOD, false);
         });
 
-        /* copy skill proficiencies?
-                //npc_saving_flag: 1
-                // npc_str/dex/con/wis/int/cha_save + _flag
+        // copy proficiencies
+        UTILS.debugChat("copying druid proficiencies");
+        
+        let profData = {};
+        profData.druidId = druidCharacterId;
+        profData.shapeId = targetCharacterId;
 
-                copyAttrNames = ["acrobatics", "animal_handling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", 
-                                 "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleight_of_hand", "stealth", "survival"];
-                copyAttrVariations = ["_prof"]
-                _.each(copyAttrNames, function (attrName) {
-                    _.each(copyAttrVariations, function (attrVar) {
-                        copyDruidAttribute(targetCharacterId, attrName + attrVar);
-                    });
-                });
-        */
+        let druidPb  = findObjs({_type: "attribute", name: STATS.PROF, _characterid: druidCharacterId})[0];
+        profData.druidPb = druidPb ? Number(druidPb.get("current")) : 0;
+        UTILS.debugChat("druid pb: " + profData.druidPb);      
+
+        for (let statIndex = 0; statIndex < 6; ++statIndex)
+        {
+            const statName = STATS.NAMES[statIndex];
+            const shortStatName = STATS.SHORT_NAMES[statIndex];
+
+            // original stat modifier on target
+            let statMod = findObjs({_type: "attribute", name: statName + WS_API.SETTINGS.STATS.SUFFIX.MOD, _characterid: targetCharacterId})[0];
+            profData.statMod = statMod ? Number(statMod.get("current")) : 0;
+            profData.shapeStatMod = modsCache[statName];
+
+            // copy save proficiency
+            profData.druidStatName = statName + STATS.SUFFIX.SAVE;
+            profData.shapeStatName = STATS.PREFIX.NPC + shortStatName + STATS.SUFFIX.SAVE;
+            profData.shapeStatValue = savesCache[statName];
+            copyDruidProficiency(profData);
+
+            // copy skill proficiency for all skills associated with this stat
+            _.each(STATS.SKILLS[statName], (skillName) => {
+                profData.druidStatName = skillName;
+                profData.shapeStatName = STATS.PREFIX.NPC + skillName;
+                profData.shapeStatValue = skillsCache[skillName];
+
+                copyDruidProficiency(profData);
+            });
+        }
+
+        // npc saving/skills flag
+        let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: targetCharacterId})[0];
+        if (npc_attr_flag)
+        {
+            npc_attr_flag.set("current", 1);
+        }
+
+        npc_attr_flag = findObjs({_type: "attribute", name: "npc_skills_flag", _characterid: targetCharacterId})[0];
+        if (npc_attr_flag)
+        {
+            npc_attr_flag.set("current", 1);
+        }
     };
 
     async function doShapeShift(shiftData) {
@@ -793,13 +981,15 @@ var WildShape = WildShape || (function() {
 
         if (WS_API.DEBUG)
         {
-            UTILS.chat("====== TARGET STATS ======");
-            UTILS.chat("token_size = " + targetData.tokenSize);
-            UTILS.chat("controlledby = " + targetData.controlledby);
-            UTILS.chat("avatar = " + targetData.imgsrc);
-            UTILS.chat("hp = " + (targetData.hp ? targetData.hp.current : "invalid"));
-            UTILS.chat("ac = " + (targetData.ac ? targetData.ac.current : "invalid"));
-            UTILS.chat("npc speed = " + (targetData.speed ? targetData.speed.current : "invalid"));
+            let debugStats = ""
+                + ("====== TARGET STATS ======")
+                + ("<br>token_size = " + targetData.tokenSize)
+                + ("<br>controlledby = " + targetData.controlledby)
+                + ("<br>avatar = " + targetData.imgsrc)
+                + ("<br>hp = " + (targetData.hp ? targetData.hp.current : "invalid"))
+                + ("<br>ac = " + (targetData.ac ? targetData.ac.current : "invalid"))
+                + ("<br>npc speed = " + (targetData.speed ? targetData.speed.current : "invalid"));
+            UTILS.debugChat(debugStats);
         }
 
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
@@ -811,7 +1001,7 @@ var WildShape = WildShape || (function() {
             // copy over druid attributes
             if (shifterSettings[WS_API.FIELDS.ISDRUID])
             {
-                copyDruidData(shifterSettings[WS_API.FIELDS.ID], shiftData.targetCharacterId);
+                copyDruidData(shiftData);
             }
 
             if (targetData.ac && config[tokenFields.ROOT][tokenFields.AC] != config[tokenFields.ROOT][tokenFields.EMPTYBAR])
@@ -938,8 +1128,9 @@ var WildShape = WildShape || (function() {
         let shape = {};
         shape[WS_API.FIELDS.ID] = shapeCharacter.get('id');
         shape[WS_API.FIELDS.CHARACTER] = shapeName;
-        shape[WS_API.FIELDS.SIZE] = WS_API.DEFAULTS.SHAPE_SIZE;
+        shape[WS_API.FIELDS.SIZE] = WS_API.SETTINGS.SHAPE_SIZE;
 
+        cacheCharacterData(shape);
         copySenses(config, shape);
         shape[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
         
@@ -982,7 +1173,7 @@ var WildShape = WildShape || (function() {
 
                 if (obj.targetShapeName !== obj.shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.CURRENT_SHAPE])
                 {
-                    if (obj.targetShapeName != WS_API.DEFAULTS.BASE_SHAPE)
+                    if (obj.targetShapeName != WS_API.SETTINGS.BASE_SHAPE)
                     {
                         obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][obj.targetShapeName];
                         if (!obj.targetShape)
@@ -1040,11 +1231,11 @@ var WildShape = WildShape || (function() {
                     let shifterSettings = {};
                     shifterSettings[WS_API.FIELDS.ID] = charId;
                     shifterSettings[WS_API.FIELDS.CHARACTER] = charObj[0].get('name');
-                    shifterSettings[WS_API.FIELDS.SIZE] = isNpc ? WS_API.DEFAULTS.SHAPE_SIZE : WS_API.DEFAULTS.SHIFTER_SIZE;
+                    shifterSettings[WS_API.FIELDS.SIZE] = isNpc ? WS_API.SETTINGS.SHAPE_SIZE : WS_API.SETTINGS.SHIFTER_SIZE;
                     shifterSettings[WS_API.FIELDS.ISDRUID] = !isNpc;
                     shifterSettings[WS_API.FIELDS.ISNPC] = isNpc;
                     shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC] = !isNpc;
-                    shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = WS_API.DEFAULTS.BASE_SHAPE;
+                    shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = WS_API.SETTINGS.BASE_SHAPE;
 
                     copySenses(config, shifterSettings);
                     shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE] = false;
@@ -1324,8 +1515,8 @@ var WildShape = WildShape || (function() {
                         let newValue = args.shift();
                         if(field == WS_API.FIELDS.CHARACTER)
                         {
-                            let shapeObj = findObjs({ type: 'character', name: newValue });
-                            if(shapeObj && shapeObj.length == 1)
+                            let shapeObj = findObjs({ type: 'character', name: newValue })[0];
+                            if(shapeObj)
                             {
                                 // clear old shape data
                                 const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
@@ -1334,24 +1525,28 @@ var WildShape = WildShape || (function() {
                                     oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
                                 }
 
-                                // set new shape id
-                                shape[WS_API.FIELDS.ID] = shapeObj[0].get('id');
-                                
                                 // set new shape data
                                 const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
                                 if (shifterCharacter)
                                 {
                                     const shifterControlledBy = shifterCharacter.get("controlledby");
-                                    shapeObj[0].set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                                    shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
                                 }
 
                                 const oldCharacterName = shape[field];
                                 shape[field] = newValue;
                                 isValueSet = true;
+                               
+                                // set new shape id
+                                shape[WS_API.FIELDS.ID] = shapeObj.get('id');
                                 
+
+                                // cache stats on the new shape
+                                cacheCharacterData(shape);
+
+                                // also rename key if the name matches
                                 if (oldCharacterName == shapeKey)
                                 {
-                                    // also rename id
                                     field = WS_API.FIELDS.NAME;
                                 }
                             }
@@ -1685,7 +1880,7 @@ var WildShape = WildShape || (function() {
             let shifterSettings = obj.shifter[WS_API.FIELDS.SETTINGS];
             obj.who = "gm";
             obj.targetShapeName = shifterSettings[WS_API.FIELDS.CURRENT_SHAPE];
-            if (obj.targetShapeName != WS_API.DEFAULTS.BASE_SHAPE)
+            if (obj.targetShapeName != WS_API.SETTINGS.BASE_SHAPE)
             {
                 obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][obj.targetShapeName];
                 if (!obj.targetShape)
@@ -1700,11 +1895,12 @@ var WildShape = WildShape || (function() {
     };
 
     const upgradeVersion = () => {
-        const currentVersion = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
-        const newConfig = WS_API.DEFAULTS.CONFIG;
+        const apiState = state[WS_API.STATENAME];
+        const currentVersion = apiState[WS_API.DATA_CONFIG].VERSION;
+        const newConfig = WS_API.DEFAULT_CONFIG;
 
-        let config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
-        let shifters = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS];
+        let config = apiState[WS_API.DATA_CONFIG];
+        let shifters = apiState[WS_API.DATA_SHIFTERS];
 
         if (UTILS.compareVersion(currentVersion, "1.0.2") < 0)
         {
@@ -1763,33 +1959,45 @@ var WildShape = WildShape || (function() {
             config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] = newConfig[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES];
         }
 
+        if (UTILS.compareVersion(currentVersion, "1.2") < 0)
+        {
+            // cache stats for all shapes
+            _.each(shifters, (shifterValue, shifterId) => {
+                _.each(shifters[shifterId][WS_API.FIELDS.SHAPES], (shapeValue, shapeId) => {
+                    cacheCharacterData(shapeValue);
+                });
+            });
+        }
+
         config.VERSION = WS_API.VERSION;
     };
 
     const setDefaults = (reset) => {
         let oldVersionDetected = null;
+        let apiState = state[WS_API.STATENAME];
 
-        if(!state[WS_API.STATENAME] || typeof state[WS_API.STATENAME] !== 'object' || reset)
+        if(!apiState || typeof apiState !== 'object' || reset)
         {
             state[WS_API.STATENAME] = {};
+            apiState = state[WS_API.STATENAME];
             reset = true;
         }
 
-        if (!state[WS_API.STATENAME][WS_API.DATA_CONFIG] || typeof state[WS_API.STATENAME][WS_API.DATA_CONFIG] !== 'object' || reset) 
+        if (!apiState[WS_API.DATA_CONFIG] || typeof apiState[WS_API.DATA_CONFIG] !== 'object' || reset) 
         {
-            state[WS_API.STATENAME][WS_API.DATA_CONFIG] = WS_API.DEFAULTS.CONFIG;
-            state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
+            apiState[WS_API.DATA_CONFIG] = WS_API.DEFAULT_CONFIG;
+            apiState[WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
             reset = true;
         }        
-        else if (UTILS.compareVersion(state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION, WS_API.VERSION) < 0)
+        else if (UTILS.compareVersion(apiState[WS_API.DATA_CONFIG].VERSION, WS_API.VERSION) < 0)
         {
-            oldVersionDetected = state[WS_API.STATENAME][WS_API.DATA_CONFIG].VERSION;
+            oldVersionDetected = apiState[WS_API.DATA_CONFIG].VERSION;
             upgradeVersion();
         }
 
-        if (!state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] || typeof state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] !== 'object' || reset)
+        if (!apiState[WS_API.DATA_SHIFTERS] || typeof apiState[WS_API.DATA_SHIFTERS] !== 'object' || reset)
         {
-            state[WS_API.STATENAME][WS_API.DATA_SHIFTERS] = {};
+            apiState[WS_API.DATA_SHIFTERS] = {};
         }
 
         MENU.updateConfig();
@@ -1815,7 +2023,7 @@ var WildShape = WildShape || (function() {
         // check install
         if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
         {
-            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelper script");
+            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelpers script");
             return;
         }
 
