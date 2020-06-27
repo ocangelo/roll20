@@ -1,9 +1,15 @@
 /*jshint -W083 */
 
 class WildUtils {
-    constructor(apiName) {
+    constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.0";
+        this.VERSION = "1.1";
+        this.DEBUG = isDebug;
+    }
+
+    debugChat(msg) {
+        if (this.DEBUG)
+            sendChat(this.APINAME, "/w gm " + msg, null, {noarchive:true});
     }
 
     chat(msg, callback = null, settings = {noarchive:true}) {
@@ -97,15 +103,15 @@ class WildUtils {
         }
     }
 
-    copyAttribute(fromId, toId, fromAttrName, toPrefix, toSuffix, onlyIfGreater = true, createAttr = false) {
-        if(!toPrefix)
-            toPrefix = "";
-        if(!toSuffix)
-            toSuffix = "";
+    copyAttribute(fromId, fromAttrName, toId, toAttrName, onlyIfGreater = true, createAttr = false) {
+        let fromAttr = findObjs({type: 'attribute', characterid: fromId, name: fromAttrName})[0];
+        if (!fromAttr)
+        {
+            this.chatError("Cannot find attribute " + fromAttrName + " on character " + fromId);
+            return;
+        }
 
-        const toAttrName = toPrefix + fromAttrName + toSuffix;
-
-        let fromAttr = getAttrByName(fromId, fromAttrName);
+        let fromAttrCurrent = fromAttr.get("current");
         let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
             if(createAttr)
@@ -113,8 +119,8 @@ class WildUtils {
                 createObj('attribute', {
                     characterid: toId,
                     name: toName,
-                    current: fromAttr,
-                    max: fromAttr
+                    current: fromAttrCurrent,
+                    max: fromAttr.get("max")
                 });
             }
             else
@@ -122,8 +128,20 @@ class WildUtils {
                 this.chatError("Cannot find attribute " + toAttrName + " on character " + toId);
             }
         }
-        else if(!onlyIfGreater || toAttr.get("current") < fromAttr)
-            toAttr.set("current", fromAttr);
+        else if(!onlyIfGreater || toAttr.get("current") < fromAttrCurrent)
+            toAttr.set("current", fromAttrCurrent);
+    }
+
+    isProficient(charId, attrName) {
+        let attr = findObjs({_type: "attribute", name: attrName, _characterid: charId})[0];
+        if(attr)
+        {
+            attr = attr.get("current");
+
+            return attr && attr.indexOf("@{pb}") >=0;
+        }
+
+        return false;
     }
 
     getCharactersWithAttr(attributeName) {
