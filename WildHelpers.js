@@ -3,13 +3,26 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.1";
+        this.VERSION = "1.2";
         this.DEBUG = isDebug;
+        this.DEBUG_CACHE = "";
     }
 
-    debugChat(msg) {
+    debugFlush(msg="") {
         if (this.DEBUG)
-            sendChat(this.APINAME, "/w gm " + msg, null, {noarchive:true});
+        {
+            sendChat(this.APINAME, "/w gm " + msg + ": " + this.DEBUG_CACHE, null, {noarchive:true});
+            this.DEBUG_CACHE = "";
+        }
+    }
+
+    debugChat(msg, flush = true) {        
+        if (this.DEBUG)
+        {
+            this.DEBUG_CACHE += "<br>" + msg;
+            if (flush)
+                this.debugFlush();
+        }
     }
 
     chat(msg, callback = null, settings = {noarchive:true}) {
@@ -82,6 +95,44 @@ class WildUtils {
         });
 
         return ordered;
+    }
+
+    getResourceAttribute(charId, name, caseSensitive) {
+        const resRegEx = new RegExp(/^repeating_resource_\-(\w+)_resource_(left|right)(_name)*$/);
+        const nameRegEx = new RegExp('^' + name + '$', caseSensitive ? '' : 'i');
+        let attrId = null;
+
+        name = name.toLowerCase();
+        let attrs = _.chain(findObjs({type:'attribute', characterid:charId}))
+            .map((a) =>
+                {
+                    let o = {attr: a, match: a.get('name').match(resRegEx)};
+                    return o;
+                })
+            .filter((o) => o.match)
+            .filter((o) => 
+                {
+                    const matchesName = o.match[3] ? o.attr.get("current").match(nameRegEx) : false;
+                    if (!attrId && matchesName)
+                    {
+                        attrId = { id : o.match[1], pos : o.match[2] };
+                    }
+                    return !o.match[3];
+                })
+            .value();
+
+        if (attrId)
+        {
+            for (let i = attrs.length - 1; i >= 0; --i)
+            { 
+                if (attrs[i].match[1] == attrId.id && attrs[i].match[2] == attrId.pos)
+                {
+                    return attrs[i].attr; 
+                }
+            }
+        }
+
+        return null;
     }
 
     setAttribute(characterId, attrName, attrCurrent, createAttr = false, attrMax = null) {
