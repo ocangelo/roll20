@@ -1044,7 +1044,7 @@ var WildShape = WildShape || (function() {
             if (targetData.speed && config[tokenFields.ROOT][tokenFields.SPEED] != config[tokenFields.ROOT][tokenFields.EMPTYBAR])
             {
                 shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_link", 'None');
-                shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_value", _.isString(targetData.speed.current) && targetData.speed.current.indexOf(' ') > 0 ? targetData.speed.current.split(' ')[0] : targetData.speed.current);
+                shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_value", ((!_.isNumber(targetData.speed.current)) && targetData.speed.current.indexOf(' ')) > 0 ? targetData.speed.current.split(' ')[0] : targetData.speed.current);
             }
 
             // set HP last in case we need to override another value because of wrong data
