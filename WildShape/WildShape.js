@@ -4,8 +4,8 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.2",
-    REQUIRED_HELPER_VERSION: "1.1",
+    VERSION : "1.2.5",
+    REQUIRED_HELPER_VERSION: "1.2",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -61,6 +61,8 @@ const WS_API = {
 
     DEFAULT_CONFIG : {
         SEP: "###",              // separator used in commands
+
+        DRUID_WS_RES : "wild shape",
 
         PC_DATA : {
             HP: "hp",
@@ -143,6 +145,8 @@ const WS_API = {
         ISNPC: "isnpc",
         CURRENT_SHAPE: "currshape",
         
+        DRUID_WS_RES: "DRUID_WS_RES",
+
         STATS_CACHE: {
             ROOT: "stats_cache",
             STATS: "stats",
@@ -192,6 +196,7 @@ const WS_API = {
 
     // major changes
     CHANGELOG : {
+        "1.2.5" : "Wild Shape Resource added to config, automatically check and decrease when Druids transform",
         "1.2"   : "automatically add corrected saving throws and proficiencies for druids",
         "1.1"   : "automatically shapeshift tokens to the last shape when copied/dropped from the journal",
         "1.0.7" : "added senses attribute setting in NPC Data",
@@ -434,6 +439,9 @@ class WildShapeMenu extends WildMenu
         let otherSettingsList = [
             this.makeListLabelValue("Commands Separator", this.SEP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
             this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+
+            this.makeListLabelValue("WildShape Resource", config[WS_API.FIELDS.DRUID_WS_RES]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.DRUID_WS_RES + this.SEP + "?{Edit|" + config[WS_API.FIELDS.DRUID_WS_RES] + "}"),
+            this.makeListLabel("Automatically check and decrease resource for Druids (case insensitive)", "font-size: 80%"),
         ];
 
         // token settings
@@ -747,7 +755,7 @@ var WildShape = WildShape || (function() {
             }
             else
             {
-                UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + attrName + "] on character: " + characterId);
+                UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + attrName + "] on character: " + shiftData.targetCharacterId);
                 return false;
             }
         }
@@ -834,7 +842,7 @@ var WildShape = WildShape || (function() {
             // target could have proficiency in a stat we don't, default to that proficiency bonus
             let statPb = profData.shapeStatValue - profData.shapeStatMod;
             const isProficient = UTILS.isProficient(profData.druidId, profData.druidStatName + WS_API.SETTINGS.STATS.SUFFIX.PROF);
-            UTILS.debugChat("-- stat " + profData.shapeStatName + ": " + profData.shapeStatValue.toString() + ", npc pb: " + statPb + ", npc mod " + profData.shapeStatMod + ", druid pb: " + (isProficient ? profData.druidPb : 0));
+            UTILS.debugChat("-- stat " + profData.shapeStatName + ": " + profData.shapeStatValue.toString() + ", npc pb: " + statPb + ", npc mod " + profData.shapeStatMod + ", druid pb: " + (isProficient ? profData.druidPb : 0), false);
 
             // check which proficiency bonus we should use
             if (isProficient && profData.druidPb > statPb)
@@ -848,7 +856,7 @@ var WildShape = WildShape || (function() {
             if (newShapeStatValue !== oldShapeStatValue || shapeStatAttr.get("current") == "")
             {
                 shapeStatAttr.set("current", newShapeStatValue);
-                UTILS.debugChat("-- CHANGING -- " + profData.shapeStatName + " from " + oldShapeStatValue + " to: " + newShapeStatValue.toString());
+                UTILS.debugChat("-- CHANGING -- " + profData.shapeStatName + " from " + oldShapeStatValue + " to: " + newShapeStatValue.toString(), false);
 
                 // also set _base value
                 shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.BASE, _characterid: profData.shapeId})[0];
@@ -897,15 +905,13 @@ var WildShape = WildShape || (function() {
         });
 
         // copy proficiencies
-        UTILS.debugChat("copying druid proficiencies");
-        
         let profData = {};
         profData.druidId = druidCharacterId;
         profData.shapeId = targetCharacterId;
 
         let druidPb  = findObjs({_type: "attribute", name: STATS.PROF, _characterid: druidCharacterId})[0];
         profData.druidPb = druidPb ? Number(druidPb.get("current")) : 0;
-        UTILS.debugChat("druid pb: " + profData.druidPb);      
+        UTILS.debugChat("druid pb: " + profData.druidPb, false);
 
         for (let statIndex = 0; statIndex < 6; ++statIndex)
         {
@@ -933,6 +939,8 @@ var WildShape = WildShape || (function() {
             });
         }
 
+        UTILS.debugFlush("copying druid proficiencies");
+
         // npc saving/skills flag
         let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: targetCharacterId})[0];
         if (npc_attr_flag)
@@ -948,13 +956,38 @@ var WildShape = WildShape || (function() {
     };
 
     async function doShapeShift(shiftData) {
+        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
 
         let isTargetNpc = true;
         let isTargetDefault = false;
+        let wildShapeResource = null;
 
         if(shiftData.targetShape)
         {
+            // if it's a druid shapeshifting check that we have enough uses of the wildshape resource left
+            if(shifterSettings[WS_API.FIELDS.ISDRUID])
+            {
+                const wsResName = config[WS_API.FIELDS.DRUID_WS_RES];
+                if(wsResName && wsResName.length > 0)
+                {
+                    wildShapeResource = UTILS.getResourceAttribute(shifterSettings[WS_API.FIELDS.ID], wsResName, false);
+                    if (wildShapeResource)
+                    {
+                        if (wildShapeResource.get("current") <= 0)
+                        {
+                            UTILS.chatErrorToPlayer(shiftData.who, "You have NO WildShape usage left for the day! resource name: " + wildShapeResource);
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        UTILS.chatErrorToPlayer(shiftData.who, "Cannot find wildshape resource = " + wsResName);
+                        return false;
+                    }
+                }
+            }
+
             shiftData.targetCharacterId = shiftData.targetShape[WS_API.FIELDS.ID];
             shiftData.targetCharacter = findObjs({ type: 'character', id: shiftData.targetCharacterId })[0];
             if (!shiftData.targetCharacter)
@@ -992,8 +1025,6 @@ var WildShape = WildShape || (function() {
             UTILS.debugChat(debugStats);
         }
 
-        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
-
         const tokenFields = WS_API.FIELDS.TOKEN_DATA;
 
         if (isTargetNpc)
@@ -1013,7 +1044,7 @@ var WildShape = WildShape || (function() {
             if (targetData.speed && config[tokenFields.ROOT][tokenFields.SPEED] != config[tokenFields.ROOT][tokenFields.EMPTYBAR])
             {
                 shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_link", 'None');
-                shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_value", targetData.speed.current.split(' ')[0]);
+                shiftData.token.set(config[tokenFields.ROOT][tokenFields.SPEED] + "_value", ((!_.isNumber(targetData.speed.current)) && targetData.speed.current.indexOf(' ')) > 0 ? targetData.speed.current.split(' ')[0] : targetData.speed.current);
             }
 
             // set HP last in case we need to override another value because of wrong data
@@ -1110,7 +1141,15 @@ var WildShape = WildShape || (function() {
         }
 
         shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] = shiftData.targetShapeName;
-        
+
+        // update wildshape resource
+        if (wildShapeResource)
+        {
+            let wsCurrent = wildShapeResource.get("current") - 1;
+            wildShapeResource.set("current",  wsCurrent);
+            UTILS.chatToPlayer(shiftData.who, config[WS_API.FIELDS.DRUID_WS_RES] + " left: " + wsCurrent + " / " + wildShapeResource.get("max"));
+        }
+
         return true;
     }
 
@@ -1515,46 +1554,54 @@ var WildShape = WildShape || (function() {
                         let newValue = args.shift();
                         if(field == WS_API.FIELDS.CHARACTER)
                         {
-                            let shapeObj = findObjs({ type: 'character', name: newValue })[0];
-                            if(shapeObj)
+                            // if we are renaming the shapeKey as well we need to make sure the new value won't point to an existing shape
+                            const oldCharacterName = shape[field];
+                            if (oldCharacterName !== shapeKey || !shifter[WS_API.FIELDS.SHAPES][newValue.trim()])
                             {
-                                // clear old shape data
-                                const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                                if (oldShapeCharacter)
+                                let shapeObj = findObjs({ type: 'character', name: newValue })[0];
+                                if(shapeObj)
                                 {
-                                    oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                    // clear old shape data
+                                    const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+                                    if (oldShapeCharacter)
+                                    {
+                                        oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                                    }
+
+                                    // set new shape data
+                                    const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
+                                    if (shifterCharacter)
+                                    {
+                                        const shifterControlledBy = shifterCharacter.get("controlledby");
+                                        shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
+                                    }
+
+                                    shape[field] = newValue;
+                                    isValueSet = true;
+                                   
+                                    // set new shape id
+                                    shape[WS_API.FIELDS.ID] = shapeObj.get('id');
+                                    
+                                    // cache stats on the new shape
+                                    cacheCharacterData(shape);
+
+				    // also rename key if the name matches
+                                    if (oldCharacterName == shapeKey)
+                                    {
+                                        field = WS_API.FIELDS.NAME;
+                                    }
                                 }
-
-                                // set new shape data
-                                const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
-                                if (shifterCharacter)
+                                else
                                 {
-                                    const shifterControlledBy = shifterCharacter.get("controlledby");
-                                    shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
-                                }
-
-                                const oldCharacterName = shape[field];
-                                shape[field] = newValue;
-                                isValueSet = true;
-                               
-                                // set new shape id
-                                shape[WS_API.FIELDS.ID] = shapeObj.get('id');
-                                
-
-                                // cache stats on the new shape
-                                cacheCharacterData(shape);
-
-                                // also rename key if the name matches
-                                if (oldCharacterName == shapeKey)
-                                {
-                                    field = WS_API.FIELDS.NAME;
+                                    UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
                                 }
                             }
                             else
                             {
-                                UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
+                                UTILS.chatError("Trying to add shape " + newValue + " which already exists");
+                                return;
                             }
-                        }                                                            
+                        }
 
                         if(field == WS_API.FIELDS.NAME)
                         {
@@ -1572,6 +1619,7 @@ var WildShape = WildShape || (function() {
                                 else
                                 {
                                     UTILS.chatError("Trying to add shape " + shapeKey + " which already exists");
+                                    shapeKey = oldShapeKey;
                                 }
                             }
                         }
@@ -1666,6 +1714,11 @@ var WildShape = WildShape || (function() {
             }
             break;
 
+            case WS_API.FIELDS.DRUID_WS_RES:
+            {
+                config[WS_API.FIELDS.DRUID_WS_RES] = args.shift();
+            }
+            break;
         }
 
         MENU.showConfigMenu();
