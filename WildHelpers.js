@@ -3,7 +3,7 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.2";
+        this.VERSION = "1.2.1";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
     }
@@ -98,7 +98,7 @@ class WildUtils {
     }
 
     getResourceAttribute(charId, name, caseSensitive) {
-        const resRegEx = new RegExp(/^repeating_resource_\-(\w+)_resource_(left|right)(_name)*$/);
+        const resRegEx = new RegExp(/^((repeating_resource_\-(?:\w+))|class|other)_resource(_left|_right)?(_name)?$/);
         const nameRegEx = new RegExp('^' + name + '$', caseSensitive ? '' : 'i');
         let attrId = null;
 
@@ -109,15 +109,19 @@ class WildUtils {
                     let o = {attr: a, match: a.get('name').match(resRegEx)};
                     return o;
                 })
-            .filter((o) => o.match)
+
+            // we only want _left|_right if it's a repeating_resource, javascript cannot use ?(2) in regex
+            .filter((o) => o.match && ((o.match[2] !== null) == (o.match[3] !== null)))
             .filter((o) => 
                 {
-                    const matchesName = o.match[3] ? o.attr.get("current").match(nameRegEx) : false;
-                    if (!attrId && matchesName)
+                    // if we matched "_name" we have to check if we found our target attribute
+                    if (!attrId && o.match[4] && o.attr.get("current").match(nameRegEx))
                     {
-                        attrId = { id : o.match[1], pos : o.match[2] };
+                        attrId = { id : o.match[1], pos : o.match[3] };
                     }
-                    return !o.match[3];
+
+                    // keep everything that doesn't have a _name at the end
+                    return !o.match[4];
                 })
             .value();
 
@@ -125,9 +129,9 @@ class WildUtils {
         {
             for (let i = attrs.length - 1; i >= 0; --i)
             { 
-                if (attrs[i].match[1] == attrId.id && attrs[i].match[2] == attrId.pos)
+                if (attrs[i].match[1] == attrId.id && attrs[i].match[3] == attrId.pos)
                 {
-                    return attrs[i].attr; 
+                    return attrs[i].attr;
                 }
             }
         }
