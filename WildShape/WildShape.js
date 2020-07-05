@@ -4,8 +4,8 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.2.5",
-    REQUIRED_HELPER_VERSION: "1.2.1",
+    VERSION : "1.2.6",
+    REQUIRED_HELPER_VERSION: "1.2.2",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -966,7 +966,7 @@ var WildShape = WildShape || (function() {
         if(shiftData.targetShape)
         {
             // if it's a druid shapeshifting check that we have enough uses of the wildshape resource left
-            if(shifterSettings[WS_API.FIELDS.ISDRUID])
+            if(shifterSettings[WS_API.FIELDS.ISDRUID] && !shiftData.ignoreDruidResource)
             {
                 const wsResName = config[WS_API.FIELDS.DRUID_WS_RES];
                 if(wsResName && wsResName.length > 0)
@@ -976,8 +976,16 @@ var WildShape = WildShape || (function() {
                     {
                         if (wildShapeResource.get("current") <= 0)
                         {
-                            UTILS.chatErrorToPlayer(shiftData.who, "You have NO WildShape usage left for the day! resource name: " + wildShapeResource);
-                            return false;
+                            if (shiftData.isGM)
+                            {
+                                wildShapeResource = null;
+                                UTILS.chat("GM OVERRIDE - You have NO WildShape usage left for the day! resource name: " + wsResName);
+                            }
+                            else
+                            {
+                                UTILS.chatErrorToPlayer(shiftData.who, "You have NO WildShape usage left for the day! resource name: " + wsResName);
+                                return false;                                
+                            }
                         }
                     }
                     else
@@ -1203,9 +1211,10 @@ var WildShape = WildShape || (function() {
         const tokenObj = getObj(msg.selected[0]._type, msg.selected[0]._id);
         const obj = findShifterData(tokenObj);
         if(obj)
-        {
+        {            
             // check that the player sending the command can actually control the token
-            if (playerIsGM(msg.playerid) || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
+            obj.isGM = playerIsGM(msg.playerid);
+            if (obj.isGM || obj.shifterControlledby.search(msg.playerid) >= 0 || obj.shifterControlledby.search("all") >= 0)
             {
                 obj.who = msg.who;
                 obj.targetShapeName = shapeName;
@@ -1931,6 +1940,8 @@ var WildShape = WildShape || (function() {
         if(obj)
         {
             let shifterSettings = obj.shifter[WS_API.FIELDS.SETTINGS];
+            obj.isGM = true;
+            obj.ignoreDruidResource = true;
             obj.who = "gm";
             obj.targetShapeName = shifterSettings[WS_API.FIELDS.CURRENT_SHAPE];
             if (obj.targetShapeName != WS_API.SETTINGS.BASE_SHAPE)
@@ -1942,7 +1953,16 @@ var WildShape = WildShape || (function() {
                     return;
                 }
 
-                doShapeShift(obj);
+                doShapeShift(obj).then((ret) => {
+                    if (ret)
+                    {
+                        UTILS.chat("Dropping shifter token, transforming " + obj.shifterId + " into " + obj.targetShapeName);
+                    }
+                    else 
+                    {
+                        UTILS.chatError("Dropping shifter token, cannot transform " + obj.shifterId + " into " + obj.targetShapeName);                        
+                    }
+                });
             }
         }
     };
@@ -2076,7 +2096,7 @@ var WildShape = WildShape || (function() {
         // check install
         if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
         {
-            UTILS.chatError("This API version (" + WS_API.VERSION + ") requires WildUtil version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelpers script");
+            UTILS.chatError("This API version " + WS_API.VERSION + " requires WildUtils version " + WS_API.REQUIRED_HELPER_VERSION + ", please update your WildHelpers script");
             return;
         }
 
