@@ -376,6 +376,69 @@ class WildUtils {
         return null;
     }
 
+    // UNTESTED
+    duplicateCharacter(tokenObj, newPrefix) {
+        let charObj = getObj('character', tokenObj.get('represents'));
+
+        let oldCid = charObj.id;
+        //let tmpC = JSON.stringify( charObj ).replace ( /\,"bio"\:.*?\,/gi, ',"bio":"",').replace ( /\,"gmnotes"\:.*?\,/gi, ',"gmnotes":"",');
+        //let tmpT = JSON.stringify( tokenObj );
+
+        //let newC = JSON.parse( tmpC );          // Simple true copy of object. 
+        let newC = simpleObj(charObj);
+        delete newC._id;
+        newC.name = newPrefix + charObj.get('name');
+        newC.avatar = this.getCleanImgsrc(newC.avatar);
+
+        //let newT = JSON.parse( tmpT );
+        //delete newT._id;
+        //newT.name = newPrefix + tokenObj.get( 'name' );
+        //newT.imgsrc = this.getCleanImgsrc(newT.imgsrc);
+
+        let newCObj = createObj('character', newC);
+        tokenObj.set('represents', newCObj.id);
+        setDefaultTokenForCharacter(newCObj, tokenObj);
+        tokenObj.set('represents', oldCid);
+        //let newTObj = createObj('graphic', newT);
+        //newTObj.set('represents', newCObj.id);
+
+        // copy attributes
+        _.each(findObjs({type:'attribute', characterid: oldCid}),(a) => {
+            //let sa = JSON.parse(JSON.stringify(a)); 
+            let sa = simpleObj(a);
+            delete sa._id;
+            delete sa._type;
+            delete sa._characterid;
+            sa._characterid = newCObj.id;
+            createObj('attribute', sa);
+        });
+
+        // copy abilities
+        _.each(findObjs({type:'ability', characterid: oldCid}),(a) => {
+            //let sa = JSON.parse(JSON.stringify(a));
+            let sa = simpleObj(a);
+            delete sa._id;
+            delete sa._type;
+            delete sa._characterid;
+            sa._characterid = newCObj.id;
+            createObj('ability', sa);
+        });
+
+        setDefaultTokenForCharacter( newCObj, newTObj);
+        toFront(newTObj);
+
+        charObj.get("bio", function(bio) {
+            if(bio && (typeof bio === 'string' && bio.trim() !== "") )
+                newCObj.set('bio', bio); 
+        });
+        charObj.get("gmnotes", function(gmnotes) {
+            if(gmnotes && (typeof gmnotes === 'string' && gmnotes.trim() !== "") )
+                newCObj.set('gmnotes', gmnotes); 
+        });
+
+        this.chat( "Duplicated: " + charObj.get("name") + " into " + newCObj.get("name"));
+    }
+
     /* UNTESTED
     findInFolder(name, folder) {
         let objectsInFolder = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
