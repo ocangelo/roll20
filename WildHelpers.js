@@ -3,7 +3,7 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.2.1";
+        this.VERSION = "1.2.2";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
     }
@@ -76,6 +76,10 @@ class WildUtils {
         return 0;
     }
 
+    regExEscape(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     getCleanImgsrc(imgsrc) {
         let parts = imgsrc.match(/(.*\/images\/.*)(thumb|med|original|max)([^\?]*)(\?[^?]+)?$/);
         if(parts) {
@@ -99,7 +103,7 @@ class WildUtils {
 
     getResourceAttribute(charId, name, caseSensitive) {
         const resRegEx = new RegExp(/^((repeating_resource_\-(?:\w+))|class|other)_resource(_left|_right)?(_name)?$/);
-        const nameRegEx = new RegExp('^' + name + '$', caseSensitive ? '' : 'i');
+        const nameRegEx = new RegExp('^' + this.regExEscape(name) + '$', caseSensitive ? '' : 'i');
         let attrId = null;
 
         name = name.toLowerCase();
@@ -200,50 +204,25 @@ class WildUtils {
     }
 
     getCharactersWithAttr(attributeName) {
-        /* start the chain with all the attribute objects named 'attributeName' */
-        return _
-        .chain(filterObjs((o)=>{
-            return (o.get('type')==='attribute' && o.get('name') === attributeName);
-        }))
+        return _.chain(
+            filterObjs((o)=>{
+                return (o.get('type')==='attribute' && o.get('name') === attributeName);
+            }))
 
-        /* IN: Array of Attribute Objects */
-        /* extract the characterid from each */
         .reduce((m,o)=>{
-            let obj={};
-            obj.cid=o.get('characterid');
-            obj[attributeName]=o;
-            m.push(obj);
+            let obj = {};
+            obj.cid = o.get('characterid');
+            obj.char = getObj('character', obj.cid);
+            if (!_.isUndefined(obj.char))
+            {
+                obj[attributeName] = o;
+                m.push(obj);
+            }
+
             return m;
-        },
-        []
-        )
+        },[])
 
-        /* IN: Array of Objects with 
-        * Character ID in property cid 
-        * attribute in [attributeName]
-        */
-        /* add characters to the objects */
-        .map((o)=>{
-            o.char=getObj('character',o.cid);
-            return o;
-        })
-
-        /* IN: Array of Objects with 
-        * Character ID in property cid 
-        * attribute in [attributeName]
-        * character in property char
-        */
-        /* remove any entries that didn't have Characters */
-        .reject( (o)=> {return _.isUndefined(o.char);} )
-
-        /* IN: Array of Character Objects */
-        /* Unwrap Chain and return the array */
         .value();
-
-        /*var charsWithPN = getCharactersWithAttrByName('player-name');
-        _.each(charsWithPN,(o)=>{
-            log(`Character ${o.char.get('name')} has player-name of ${o['player-name'].get('current')}/${o['player-name'].get('max')}`);
-        });*/
     }
 
     getCharactersWithAttrValue(attribute, value) {
