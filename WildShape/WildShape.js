@@ -5,10 +5,10 @@
 const WS_API = {
     NAME : "WildShape",
     VERSION : "1.2.6",
-    REQUIRED_HELPER_VERSION: "1.2.2",
+    REQUIRED_HELPER_VERSION: "1.3",
 
     STATENAME : "WILDSHAPE",
-    DEBUG : false,
+    DEBUG : true,
 
     // storage in the state
     DATA_CONFIG : "config",
@@ -144,6 +144,7 @@ const WS_API = {
         MAKEROLLPUBLIC: "makerollpublic",
         ISNPC: "isnpc",
         CURRENT_SHAPE: "currshape",
+        ISDUPLICATE: "isDuplicate",
         
         DRUID_WS_RES: "DRUID_WS_RES",
 
@@ -377,7 +378,9 @@ class WildShapeMenu extends WildMenu
 
         // shapes section
         let shapesDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}" + this.SEP + "?{Simple Name (optional)}") + this.makeListButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}" + this.SEP + "?{Simple Name (optional)}")
+            this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>")
+            + this.makeListButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}" + this.SEP + "?{Simple Name (optional)}" + this.SEP + "?{Name Prefix (optional)}") 
+            + this.makeListButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}" + this.SEP + "?{Simple Name (optional)}" + this.SEP + "?{Name Prefix (optional)}")
         ];
 
         _.each(shifterShapes, (value, shapeId) =>
@@ -646,23 +649,6 @@ var WildShape = WildShape || (function() {
         return null;
     };
 
-    async function getDefaultTokenImage(character) {
-        let img = null;
-
-        // get token image
-        character.get('defaulttoken', function(defaulttoken) {
-            const dt = JSON.parse(defaulttoken);
-            img = dt ? UTILS.getCleanImgsrc(dt.imgsrc) : "";
-        });
-
-        while (img == null)
-        {
-            await UTILS.sleep(50);
-        }
-
-        return img;
-    }
-
     async function getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
@@ -710,7 +696,7 @@ var WildShape = WildShape || (function() {
             speedName   = config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED];
 
             // the get on _defaulttoken is async, need to wait on it
-            await getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
+            await UTILS.getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
                 targetImg = img;
 
                 if (!targetImg || targetImg == "")
@@ -1161,7 +1147,18 @@ var WildShape = WildShape || (function() {
         return true;
     }
 
-    const addShapeToShifter = (config, shifter, shapeCharacter, shapeId = null, doSort = true) => {
+    async function addShapeToShifter(config, shifter, shapeCharacter, shapeNamePrefix, shapeId = null, doSort = true) {
+        UTILS.debugChat("duplicating character");
+        await UTILS.duplicateCharacter(shapeCharacter, shapeNamePrefix).then(
+            (newShapeCharacter) => { shapeCharacter = newShapeCharacter; }
+        );
+
+        if(!shapeCharacter)
+        {
+            UTILS.chatERROR("error duplicating character when adding new shape");
+            return false;                        
+        }
+
         const shapeName = shapeCharacter.get('name');
         if ((!shapeId) || (typeof shapeId !== 'string') || (shapeId.length == 0))
             shapeId = shapeName;
@@ -1169,6 +1166,7 @@ var WildShape = WildShape || (function() {
         if (shifter[WS_API.FIELDS.SHAPES][shapeId])
         {
             UTILS.chatError("Trying to add a shape with an ID that's already used, skipping: " + shapeId);
+            shapeCharacter.remove();
             return false;
         }
 
@@ -1176,6 +1174,7 @@ var WildShape = WildShape || (function() {
         shape[WS_API.FIELDS.ID] = shapeCharacter.get('id');
         shape[WS_API.FIELDS.CHARACTER] = shapeName;
         shape[WS_API.FIELDS.SIZE] = WS_API.SETTINGS.SHAPE_SIZE;
+        shape[WS_API.FIELDS.ISDUPLICATE] = true;
 
         cacheCharacterData(shape);
         copySenses(config, shape);
@@ -1196,7 +1195,7 @@ var WildShape = WildShape || (function() {
         }
 
         return true;
-    };
+    }
 
     const handleInputShift = (msg, args, config) => 
     {
@@ -1313,21 +1312,22 @@ var WildShape = WildShape || (function() {
         }
     };
 
-    const handleInputAddShape = (msg, args, config) => 
+    async function handleInputAddShape(msg, args, config) 
     {
         const shifterKey = args.shift();
         const shapeName = args.shift();
-        let shapeKey = args.shift().trim();
         if (shapeName && shapeName.length > 0)
         {
             let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
             if (shifter)
             {
+                let shapeKey = args.shift();
+                let shapePrefix = args.shift();
                 let shapeObj = findObjs({ type: 'character', name: shapeName });
                 if(shapeObj && shapeObj.length == 1)
                 {
-                    if(addShapeToShifter(config, shifter, shapeObj[0], shapeKey))
-                        MENU.showEditShifter(shifterKey);
+                    await addShapeToShifter(config, shifter, shapeObj[0], shapePrefix, shapeKey).then( 
+                        (ret) => { if (ret) MENU.showEditShifter(shifterKey);} );
                 }
                 else
                 {
@@ -1340,7 +1340,7 @@ var WildShape = WildShape || (function() {
                 MENU.showShifters();
             }
         }
-    };
+    }
 
     const handleInputRemoveShifter = (msg, args, config) => 
     {
@@ -1390,7 +1390,14 @@ var WildShape = WildShape || (function() {
                 const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
                 if (shapeCharacter)
                 {
-                    shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                    if(shape[WS_API.FIELDS.ISDUPLICATE])
+                    {
+                        shapeCharacter.remove();
+                    }
+                    else
+                    {
+                        shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                    }
                 }
 
                 delete shifter[WS_API.FIELDS.SHAPES][shapeKey];
@@ -1733,7 +1740,7 @@ var WildShape = WildShape || (function() {
         MENU.showConfigMenu();
     };
 
-    const handleInputImportShapeFolder = (msg, args, config) => 
+    async function handleInputImportShapeFolder(msg, args, config) 
     {
         const shifterKey = args.shift();
         let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
@@ -1761,7 +1768,7 @@ var WildShape = WildShape || (function() {
 
                         // rename
                         let oldName = shapeObj.get("name");
-                        if(oldPrefix || newPrefix)
+                        if (oldPrefix || newPrefix)
                         {
                             let name = oldName;
                             if(oldPrefix && name.startsWith(oldPrefix)) {
@@ -1782,8 +1789,8 @@ var WildShape = WildShape || (function() {
                         }
 
                         // add shape to shifter
-                        if(!addShapeToShifter(config, shifter, shapeObj, shapeId, false))
-                            shapeObj.set("name", oldName);
+                        //await addShapeToShifter(config, shifter, shapeObj, "", shapeId, false).then( 
+                        //    (ret) => { if(!ret) shapeObj.set("name", oldName);} );
                     }
                 });
 
@@ -1802,7 +1809,7 @@ var WildShape = WildShape || (function() {
             UTILS.chatError("Trying to add shape to ShapeShifter " + shifterKey + " which doesn't exist");
             MENU.showShifters();
         }                                                
-    };
+    }
 
     const handleInput = (msg) => {
         if (msg.type === "api" && msg.content.indexOf(WS_API.CMD.ROOT) == 0)
@@ -2110,8 +2117,8 @@ var WildShape = WildShape || (function() {
             }, 100);
         });
 
-        log(WS_API.NAME + ' Ready!');
-        UTILS.chat("API Ready, command: " + WS_API.CMD.ROOT);
+        log(WS_API.NAME + ' v' + WS_API.VERSION + " Ready! WildUtils v" + UTILS.VERSION);
+        UTILS.chat("API v" + WS_API.VERSION + " Ready! command: " + WS_API.CMD.ROOT);
     };
     
     return {

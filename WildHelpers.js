@@ -3,7 +3,7 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.2.2";
+        this.VERSION = "1.3";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
     }
@@ -16,10 +16,10 @@ class WildUtils {
         }
     }
 
-    debugChat(msg, flush = true) {        
+    debugChat(msg, flush = true) {
         if (this.DEBUG)
         {
-            this.DEBUG_CACHE += "<br>" + msg;
+            this.DEBUG_CACHE += (this.DEBUG_CACHE !== "" ? "<br>" : "") + msg;
             if (flush)
                 this.debugFlush();
         }
@@ -376,67 +376,114 @@ class WildUtils {
         return null;
     }
 
+    async getDefaultToken(character) {
+        let token = null;
+        let maxTimeout = 3000;
+
+        // get token image
+        character.get('defaulttoken', function(defaultToken) {
+            token = defaultToken ? defaultToken : "";
+        });
+
+        while (maxTimeout > 0 && !token)
+        {
+            await this.sleep(50);
+            maxTimeout -= 50;
+        }
+
+        return token && token !== "" ? JSON.parse(token) : null;
+    }
+
+    async getDefaultTokenImage(character) {
+        let img = null;
+
+        // get token image
+        await this.getDefaultToken(character).then((token) => {
+            img = token ? this.getCleanImgsrc(token.imgsrc) : "";
+        });
+
+        return img;
+    }
+
     // UNTESTED
-    duplicateCharacter(tokenObj, newPrefix) {
-        let charObj = getObj('character', tokenObj.get('represents'));
+    async duplicateCharacter(targetCharacter, newPrefix) {
+        if (!targetCharacter)
+        {
+            this.chatError("trying to duplicate invalid character");
+            return null;
+        }
 
-        let oldCid = charObj.id;
-        //let tmpC = JSON.stringify( charObj ).replace ( /\,"bio"\:.*?\,/gi, ',"bio":"",').replace ( /\,"gmnotes"\:.*?\,/gi, ',"gmnotes":"",');
-        //let tmpT = JSON.stringify( tokenObj );
+        let targetCharId = targetCharacter.get("_id");
 
-        //let newC = JSON.parse( tmpC );          // Simple true copy of object. 
-        let newC = simpleObj(charObj);
-        delete newC._id;
-        newC.name = newPrefix + charObj.get('name');
-        newC.avatar = this.getCleanImgsrc(newC.avatar);
+        // delete = characterObj.remove(), token.remove()
 
-        //let newT = JSON.parse( tmpT );
-        //delete newT._id;
-        //newT.name = newPrefix + tokenObj.get( 'name' );
-        //newT.imgsrc = this.getCleanImgsrc(newT.imgsrc);
+        const simpleObj = (o) => JSON.parse(JSON.stringify(o));
+        //const simpleCharObj = (o) => JSON.parse(JSON.stringify(o).replace ( /\,"bio"\:.*?\,/gi, ',"bio":"",').replace ( /\,"gmnotes"\:.*?\,/gi, ',"gmnotes":"",'));
+        const simpleCharObj = simpleObj;
 
-        let newCObj = createObj('character', newC);
-        tokenObj.set('represents', newCObj.id);
-        setDefaultTokenForCharacter(newCObj, tokenObj);
-        tokenObj.set('represents', oldCid);
-        //let newTObj = createObj('graphic', newT);
-        //newTObj.set('represents', newCObj.id);
+        // create new character
+        let newSimpleCharacter = simpleCharObj(targetCharacter);
+        delete newSimpleCharacter._id;
+        newSimpleCharacter.name = newPrefix + targetCharacter.get('name');
+        newSimpleCharacter.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
 
+        // setup token
+        let newCharacter = createObj('character', newSimpleCharacter);
+    
         // copy attributes
-        _.each(findObjs({type:'attribute', characterid: oldCid}),(a) => {
-            //let sa = JSON.parse(JSON.stringify(a)); 
-            let sa = simpleObj(a);
-            delete sa._id;
-            delete sa._type;
-            delete sa._characterid;
-            sa._characterid = newCObj.id;
-            createObj('attribute', sa);
+        _.each(findObjs({type:'attribute', characterid: targetCharId}), (attr) => {
+            let simpleAttr = simpleObj(attr);
+            delete simpleAttr._id;
+            delete simpleAttr._type;
+            delete simpleAttr._characterid;
+            simpleAttr._characterid = newCharacter.id;
+            createObj('attribute', simpleAttr);
         });
 
         // copy abilities
-        _.each(findObjs({type:'ability', characterid: oldCid}),(a) => {
-            //let sa = JSON.parse(JSON.stringify(a));
-            let sa = simpleObj(a);
-            delete sa._id;
-            delete sa._type;
-            delete sa._characterid;
-            sa._characterid = newCObj.id;
-            createObj('ability', sa);
+        _.each(findObjs({type:'ability', characterid: targetCharId}), (ability) => {
+            let simpleAbility = simpleObj(ability);
+            delete simpleAbility._id;
+            delete simpleAbility._type;
+            delete simpleAbility._characterid;
+            simpleAbility._characterid = newCharacter.id;
+            createObj('ability', simpleAbility);
         });
 
-        setDefaultTokenForCharacter( newCObj, newTObj);
-        toFront(newTObj);
-
-        charObj.get("bio", function(bio) {
+        await targetCharacter.get("bio", function(bio) {
             if(bio && (typeof bio === 'string' && bio.trim() !== "") )
-                newCObj.set('bio', bio); 
-        });
-        charObj.get("gmnotes", function(gmnotes) {
-            if(gmnotes && (typeof gmnotes === 'string' && gmnotes.trim() !== "") )
-                newCObj.set('gmnotes', gmnotes); 
+                newCharacter.set('bio', bio); 
         });
 
-        this.chat( "Duplicated: " + charObj.get("name") + " into " + newCObj.get("name"));
+        await targetCharacter.get("gmnotes", function(gmnotes) {
+            if(gmnotes && (typeof gmnotes === 'string' && gmnotes.trim() !== "") )
+                newCharacter.set('gmnotes', gmnotes); 
+        });
+
+        this.debugChat("setting token on new character");
+        let token = findObjs({type: 'graphic', subtype: "token", represents: targetCharId})[0];
+        if(token)
+        {           
+            this.debugChat("default token str " + JSON.stringify(token));
+            if(token)
+            {
+                this.debugChat("setting represents " + newCharacter.get("_id"));
+                token.set("represents", newCharacter.get("_id"));
+                this.debugChat("set represents");
+                
+                this.debugChat("token setting default");
+                setDefaultTokenForCharacter(newCharacter, token);
+                token.set("represents", targetCharId);
+                this.debugChat("token set on new character");
+            }
+            else
+            {
+                this.debugChat("cannot find default token");
+            }
+        }
+
+        this.chat( "Duplicated: " + targetCharacter.get("name") + " into " + newCharacter.get("name"));
+        return newCharacter;
     }
 
     /* UNTESTED
