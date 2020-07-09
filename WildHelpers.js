@@ -391,7 +391,7 @@ class WildUtils {
             maxTimeout -= 50;
         }
 
-        return token && token !== "" ? JSON.parse(token) : null;
+        return token && token.trim() !== "" ? JSON.parse(token) : null;
     }
 
     async getDefaultTokenImage(character) {
@@ -405,8 +405,7 @@ class WildUtils {
         return img;
     }
 
-    // UNTESTED
-    async duplicateCharacter(targetCharacter, newPrefix) {
+    async duplicateCharacter(targetCharacter, newCharacterName) {
         if (!targetCharacter)
         {
             this.chatError("trying to duplicate invalid character");
@@ -415,16 +414,12 @@ class WildUtils {
 
         let targetCharId = targetCharacter.get("_id");
 
-        // delete = characterObj.remove(), token.remove()
-
-        const simpleObj = (o) => JSON.parse(JSON.stringify(o));
-        //const simpleCharObj = (o) => JSON.parse(JSON.stringify(o).replace ( /\,"bio"\:.*?\,/gi, ',"bio":"",').replace ( /\,"gmnotes"\:.*?\,/gi, ',"gmnotes":"",'));
-        const simpleCharObj = simpleObj;
+        const jsonObj = (o) => JSON.parse(JSON.stringify(o));
 
         // create new character
-        let newSimpleCharacter = simpleCharObj(targetCharacter);
+        let newSimpleCharacter = jsonObj(targetCharacter);
         delete newSimpleCharacter._id;
-        newSimpleCharacter.name = newPrefix + targetCharacter.get('name');
+        newSimpleCharacter.name = newCharacterName;
         newSimpleCharacter.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
 
         // setup token
@@ -432,7 +427,7 @@ class WildUtils {
     
         // copy attributes
         _.each(findObjs({type:'attribute', characterid: targetCharId}), (attr) => {
-            let simpleAttr = simpleObj(attr);
+            let simpleAttr = jsonObj(attr);
             delete simpleAttr._id;
             delete simpleAttr._type;
             delete simpleAttr._characterid;
@@ -442,7 +437,7 @@ class WildUtils {
 
         // copy abilities
         _.each(findObjs({type:'ability', characterid: targetCharId}), (ability) => {
-            let simpleAbility = simpleObj(ability);
+            let simpleAbility = jsonObj(ability);
             delete simpleAbility._id;
             delete simpleAbility._type;
             delete simpleAbility._characterid;
@@ -450,31 +445,24 @@ class WildUtils {
             createObj('ability', simpleAbility);
         });
 
-        await targetCharacter.get("bio", function(bio) {
-            if(bio && (typeof bio === 'string' && bio.trim() !== "") )
+        targetCharacter.get("bio", function(bio) {
+            if (bio && typeof bio === 'string' && bio.trim() !== "" && bio !== "null")
                 newCharacter.set('bio', bio); 
         });
 
-        await targetCharacter.get("gmnotes", function(gmnotes) {
-            if(gmnotes && (typeof gmnotes === 'string' && gmnotes.trim() !== "") )
+        targetCharacter.get("gmnotes", function(gmnotes) {
+            if (gmnotes && typeof gmnotes === 'string' && gmnotes.trim() !== "" && gmnotes !== "null")
                 newCharacter.set('gmnotes', gmnotes); 
         });
 
-        this.debugChat("setting token on new character");
         let token = findObjs({type: 'graphic', subtype: "token", represents: targetCharId})[0];
         if(token)
-        {           
-            this.debugChat("default token str " + JSON.stringify(token));
+        {
             if(token)
             {
-                this.debugChat("setting represents " + newCharacter.get("_id"));
                 token.set("represents", newCharacter.get("_id"));
-                this.debugChat("set represents");
-                
-                this.debugChat("token setting default");
                 setDefaultTokenForCharacter(newCharacter, token);
                 token.set("represents", targetCharId);
-                this.debugChat("token set on new character");
             }
             else
             {
@@ -521,7 +509,7 @@ class WildMenu {
     }
 
     makeListLabel(itemName, addStyle) {
-        return '<span style="float: left; ' + addStyle + '">' + itemName + '</span> ';
+        return '<span style="' + addStyle + '">' + itemName + '</span> ';
     }
 
     makeListLabelValue(name, value, defaultValue = '', addStyle = null)
