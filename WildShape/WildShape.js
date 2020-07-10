@@ -2,11 +2,6 @@
 original script from: https://github.com/ocangelo/roll20
 */
 
-/* TODO:    
-    - delete shape characters on shifter remove and config reset
-    - disable DEBUG
-*/
-
 /*jshint -W069 */
 /*jshint -W014 */
 /*jshint -W083 */
@@ -17,7 +12,7 @@ const WS_API = {
     REQUIRED_HELPER_VERSION: "1.3",
 
     STATENAME : "WILDSHAPE",
-    DEBUG : true,
+    DEBUG : false,
 
     // storage in the state
     DATA_CONFIG : "config",
@@ -208,6 +203,8 @@ const WS_API = {
 
     // major changes
     CHANGELOG : {
+        "1.3"   : "automatically duplicate/delete characters when adding/removing new shapes",
+        "1.2.6" : "added setting to mute players chat messages",
         "1.2.5" : "Wild Shape Resource added to config, automatically check and decrease when Druids transform",
         "1.2"   : "automatically add corrected saving throws and proficiencies for druids",
         "1.1"   : "automatically shapeshift tokens to the last shape when copied/dropped from the journal",
@@ -340,7 +337,7 @@ class WildShapeMenu extends WildMenu
             this.makeLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
-        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
+        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure you want to delete " + shapeId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
         const editShifterButton = this.makeButton("Edit Shifter: " + shifterId, cmdShifterEdit, ' width: 100%');
 
         let contents = this.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
@@ -393,7 +390,7 @@ class WildShapeMenu extends WildMenu
 
         _.each(shifterShapes, (value, shapeId) =>
         {
-            shapesDataList.push(this.makeLabel(shapeId) + this.makeRightButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeRightButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
+            shapesDataList.push(this.makeLabel(shapeId) + this.makeRightButton("Del", cmdRemove + "?{Are you sure you want to delete " + shapeId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeRightButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
         });
         //listItems.push(this.makeList(shapesDataList, " padding-left: 10px"));
 
@@ -401,13 +398,13 @@ class WildShapeMenu extends WildMenu
         const shapeButtons =
             "<table style='width: 100%'><tr><td>" + this.makeButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}", 'width: 100%') + "<td>" + this.makeButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}", 'width: 100%') + "</table>"
             + this.makeButton("Import Shapes from Folder", cmdImport + WS_API.FIELDS.TARGET.SHAPEFOLDER + this.SEP + shifterId + this.SEP + "?{Folder Name}" + this.SEP + "?{Find in Subfolders?|no|yes}" + this.SEP + "?{Remove Prefix (optional)}", ' width: 100%')
-            + this.makeLabelComment("Adding a single shape may take a few seconds, importing several may take a while; please wait until you see the result in the chat");
+            + this.makeLabelComment("Adding a single shape may take a several seconds (around 4s), importing several shapes from a folder may take a while (e.g. 15 shapes should take around 1 minute); please wait until you see the results in the chat");
 
-        const deleteShapesButton = this.makeButton("Delete All Shapes", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId, ' width: 100%');
+        const deleteShapesButton = this.makeButton("Delete All Shapes", cmdRemove + "?{Are you sure you want to delete all shapes?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId, ' width: 100%');
         //const importShapesButton = this.makeButton("Import Shapes", cmdImport + WS_API.FIELDS.TARGET.SHAPE + this.SEP + "?{Shapes Data}", ' width: 100%');
         //const exportShapesButton = this.makeButton("Export Shapes", cmdExport + WS_API.FIELDS.TARGET.SHAPE, ' width: 100%');
         //const exportShifterButton = this.makeButton("Export Shifter", cmdExport + WS_API.FIELDS.TARGET.SHIFTER, ' width: 100%');
-        const deleteShifterButton = this.makeButton("Delete: " + shifterId, cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId, ' width: 100%');
+        const deleteShifterButton = this.makeButton("Delete Shifter: " + shifterId, cmdRemove + "?{Are you sure you want to delete the shifter?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId, ' width: 100%');
         const showShiftersButton = this.makeButton("Show ShapeShifters", this.CMD.ROOT + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
 
         //let contents = this.makeList(listItems) + importShapesFromFolderButton /*+ importShapesButton + exportShapesButton + exportShifterButton*/ + '<hr>' + deleteShifterButton + '<hr>' + showShiftersButton;
@@ -428,7 +425,7 @@ class WildShapeMenu extends WildMenu
         let listItems = [];
         _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (value, shifterId) => {
             const shifterSettings = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId][WS_API.FIELDS.SETTINGS];
-            listItems.push(this.makeLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeRightButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeRightButton("Edit", cmdShifterEdit + shifterId));
+            listItems.push(this.makeLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeRightButton("Del", cmdRemove + "?{Are you sure you want to delete " + shifterId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeRightButton("Edit", cmdShifterEdit + shifterId));
         });
 
         let pcs = this.UTILS.getPCNames().sort().join('|');
@@ -511,7 +508,7 @@ class WildShapeMenu extends WildMenu
         ];
 
         // finalization
-        const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET + this.SEP + "?{Are you sure?|no|yes}", ' width: 100%');
+        const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET + this.SEP + "?{Are you sure you want to reset all configs?|no|yes}", ' width: 100%');
 
         let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((newVersion) ? ': New Version Setup' : ': Config');
         let contents = showShiftersButton + '<hr>'
@@ -1174,14 +1171,15 @@ var WildShape = WildShape || (function() {
             return false;
         }
 
-        await UTILS.duplicateCharacter(shapeCharacter, newCharacterName).then(
-            (newShapeCharacter) => { shapeCharacter = newShapeCharacter; }
-        );
+        await UTILS.duplicateCharacter(shapeCharacter, newCharacterName)
+            .then(
+                function(newShapeCharacter) { shapeCharacter = newShapeCharacter; }
+            );
 
         if(!shapeCharacter)
         {
-            UTILS.chatERROR("error duplicating character when adding new shape");
-            return false;                        
+            UTILS.chatError("cannot duplicate character, skipping: " + shapeId);
+            return false;
         }
 
         let shape = {};
@@ -1353,7 +1351,7 @@ var WildShape = WildShape || (function() {
         }
     }
 
-    const handleInputRemoveShifter = (msg, args, config) => 
+    async function handleInputRemoveShifter(msg, args, config) 
     {
         const shifterKey = args.shift();
         if (shifterKey)
@@ -1362,14 +1360,7 @@ var WildShape = WildShape || (function() {
             {
                 let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
                 _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
-                    if (shape)
-                    {
-                        const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                        if (shapeCharacter)
-                        {
-                            shapeCharacter.set({controlledby: "", inplayerjournals: ""});
-                        }
-                    }
+                    removeShape(shape);
                 });
 
                 delete state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
@@ -1386,9 +1377,33 @@ var WildShape = WildShape || (function() {
         }
 
         MENU.showShifters();
+    }
+
+    const removeShape = (shape) =>
+    {
+        if (shape)
+        {
+            const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+            if (shapeCharacter)
+            {
+                // versions earlier than 1.3 don't have the automatic duplicate, preserve characters
+                if(shape[WS_API.FIELDS.ISDUPLICATE])
+                {
+                    shapeCharacter.remove();
+                }
+                else
+                {
+                    shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     };
 
-    const handleInputRemoveShape = (msg, args, config) => 
+    async function handleInputRemoveShape(msg, args, config)
     {
         const shifterKey = args.shift();
         const shapeKey = args.shift();
@@ -1398,22 +1413,8 @@ var WildShape = WildShape || (function() {
             if (shapeKey)
             {
                 let shape = shifter[WS_API.FIELDS.SHAPES][shapeKey];
-                if (shape)
+                if (removeShape(shape))
                 {
-                    const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                    if (shapeCharacter)
-                    {
-                        // versions earlier than 1.3 don't have the automatic duplicate, preserve characters
-                        if(shape[WS_API.FIELDS.ISDUPLICATE])
-                        {
-                            shapeCharacter.remove();
-                        }
-                        else
-                        {
-                            shapeCharacter.set({controlledby: "", inplayerjournals: ""});
-                        }
-                    }
-
                     delete shifter[WS_API.FIELDS.SHAPES][shapeKey];
                 }
                 else
@@ -1451,7 +1452,7 @@ var WildShape = WildShape || (function() {
             UTILS.chatError("Trying to remove shape from ShapeShifter " + shifterKey + " which doesn't exist");
             MENU.showShifters();
         }
-    };
+    }
 
     const handleInputEditSenses = (msg, args, config, senses) => 
     {
@@ -1736,7 +1737,9 @@ var WildShape = WildShape || (function() {
         {
             const folderName = args.shift();
             const searchSubfolders = args.shift() == 'yes';
-            const removePrefix = args.shift();
+            let removePrefix = args.shift();
+            if (removePrefix == "")
+                removePrefix = null;
 
             let folderShapes = UTILS.findCharactersInFolder(folderName, searchSubfolders);
             if(folderShapes)
@@ -1748,6 +1751,7 @@ var WildShape = WildShape || (function() {
                     UTILS.chat("shapes found in input folder = " + debugShapeNames);
                 }
 
+                UTILS.chat("start importing shapes...");
                 let importedShapes = 0;
 
                 for (let shapeIndex = folderShapes.length - 1; shapeIndex >= 0; --shapeIndex) {
@@ -1761,7 +1765,7 @@ var WildShape = WildShape || (function() {
                             newName = newName.slice(removePrefix.length);
                         }
 
-                        let shapeId = newName;
+                        const shapeId = newName;
                         newName = shifterKey + " - " + newName;
 
                         // add shape to shifter
@@ -1775,6 +1779,11 @@ var WildShape = WildShape || (function() {
                     sortShapes(shifter);
                     MENU.showEditShifter(shifterKey);
                     UTILS.chat("Imported " + importedShapes + "/" + folderShapes.length + " Shapes from folder [" + folderName + "]");
+                }
+
+                if (importedShapes < folderShapes.length)
+                {
+                    UTILS.chat("Not all shapes were imported, please check for errors " + (importedShapes > 0 ? "above the menu" : ""));
                 }
             }
             else
@@ -2030,12 +2039,24 @@ var WildShape = WildShape || (function() {
         config.VERSION = WS_API.VERSION;
     };
 
-    const setDefaults = (reset) => {
+    async function setDefaults(reset)
+    {
         let oldVersionDetected = null;
         let apiState = state[WS_API.STATENAME];
 
+
         if(!apiState || typeof apiState !== 'object' || reset)
         {
+            if(state[WS_API.STATENAME])
+            {
+                _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], 
+                    (shifter) => {
+                        _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
+                            removeShape(shape);
+                        });
+                });                
+            }
+
             state[WS_API.STATENAME] = {};
             apiState = state[WS_API.STATENAME];
             reset = true;
@@ -2075,9 +2096,10 @@ var WildShape = WildShape || (function() {
                 UTILS.chat("New version detected, updated from " + oldVersionDetected + " to " + WS_API.VERSION);
             }
         }
-    };
+    }
 
-    const start = () => {
+    async function start()
+    {
         // check install
         if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
         {
@@ -2085,7 +2107,7 @@ var WildShape = WildShape || (function() {
             return;
         }
 
-        setDefaults();
+        await setDefaults();
 
         // register event handlers
         on('chat:message', handleInput);
@@ -2097,7 +2119,7 @@ var WildShape = WildShape || (function() {
 
         log(WS_API.NAME + ' v' + WS_API.VERSION + " Ready! WildUtils v" + UTILS.VERSION);
         UTILS.chat("API v" + WS_API.VERSION + " Ready! command: " + WS_API.CMD.ROOT);
-    };
+    }
     
     return {
         start

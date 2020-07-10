@@ -327,6 +327,7 @@ class WildUtils {
 
 
     findCharactersInFolder(folder, findInSubfolders = false) {
+        folder = folder.replace("\\","/");
         let folderData = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
         
         if (folderData)
@@ -412,18 +413,12 @@ class WildUtils {
             return null;
         }
 
+        let targetCharacterName = targetCharacter.get("name");
         let targetCharId = targetCharacter.get("_id");
 
+        let errorMsgHeader = "WildUtils::duplicateCharacter (" + targetCharacterName + " -> " + newCharacterName + "): ";
+
         const jsonObj = (o) => JSON.parse(JSON.stringify(o));
-
-        // create new character
-        let newCharacterData = jsonObj(targetCharacter);
-        delete newCharacterData._id;
-        newCharacterData.name = newCharacterName;
-        newCharacterData.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
-
-        let newCharacter = createObj('character', newCharacterData);
-        let newCharacterId = newCharacter.get("_id");
 
         // find character token
         let characterToken = null;
@@ -434,36 +429,58 @@ class WildUtils {
         {
             // make a copy of the data and create a new off screen temporary graphic token
             characterToken = jsonObj(characterToken);
+            characterToken.imgsrc = this.getCleanImgsrc(characterToken.imgsrc);
+            if(characterToken.imgsrc == "")
+            {
+                characterToken.imgsrc = this.getCleanImgsrc(targetCharacter.get("avatar"));
+                if(characterToken.imgsrc == "")
+                {
+                    this.chatError(errorMsgHeader + "cannot find image on either token or avatar; if it's using a marketplace link the image needs to be re-uploaded into the library and set on the target character as either token or avatar image");
+                    characterToken = null;
+                    return null;
+                }
+            }
+
+            // graphic token data setup
             characterToken._pageid = Campaign().get("playerpageid");
             characterToken.layer = "gmlayer";
             characterToken.left = -500;
             characterToken.top = -500;
-            characterToken.imgsrc = this.getCleanImgsrc(characterToken.imgsrc);
+        }
 
-            characterToken = createObj("graphic", characterToken);
-            if (characterToken)
+        // create new character
+        let newCharacterData = jsonObj(targetCharacter);
+        delete newCharacterData._id;
+        newCharacterData.name = newCharacterName;
+        newCharacterData.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
+
+        let newCharacter = createObj('character', newCharacterData);
+        let newCharacterId = newCharacter.get("_id");
+
+        // create a copy of the character token
+        characterToken = createObj("graphic", characterToken);
+        if (characterToken)
+        {
+            characterToken.set("represents", newCharacterId);
+
+            // cache link info
+            for (let i = 0; i < 3; ++i)
             {
-                characterToken.set("represents", newCharacterId);
-
-                // cache link info
-                for (let i = 0; i < 3; ++i)
+                let linkData = characterToken.get("bar" + (i + 1).toString() + "_link");
+                if (linkData && linkData !== "")
                 {
-                    let linkData = characterToken.get("bar" + (i + 1).toString() + "_link");
-                    if (linkData && linkData !== "")
+                    let linkAttr = getObj("attribute", linkData);
+                    if (linkAttr)
                     {
-                        let linkAttr = getObj("attribute", linkData);
-                        if (linkAttr)
-                        {
-                            tokenLinks[i] = linkData;
-                            tokenLinksAttr[i] = linkAttr.get("name");
-                        }
+                        tokenLinks[i] = linkData;
+                        tokenLinksAttr[i] = linkAttr.get("name");
                     }
                 }
             }
-            else
-            {
-                this.chatError("WildUtils::duplicateCharacter: cannot create a new graphic token");
-            }
+        }
+        else
+        {
+            this.chatError(errorMsgHeader + "cannot create a new graphic token");
         }
 
         // copy attributes
@@ -511,7 +528,7 @@ class WildUtils {
             characterToken.remove();
         }
 
-        this.debugChat("Duplicated: " + targetCharacter.get("name") + " into " + newCharacter.get("name"));
+        this.debugChat("Duplicated: " + targetCharacterName + " into " + newCharacterName);
         return newCharacter;
     }
 }
