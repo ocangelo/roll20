@@ -9,7 +9,7 @@ After that you can copy the main WildShape script: https://github.com/ocangelo/r
 * can be used for both PC and NPC to shape shift into either a PC or an NPC
 * alt-double clicking on the "shape shifted" token will open the relative pc/npc sheet so that you can run actions from your new shape
 * automatically:
-    * copy INT/WIS/CHA attributes for druids to NPCs
+	* DRUIDS ONLY: copy INT/WIS/CHA attributes to NPCs and set corrected saving throws and skills considering proficiencies according to 5e rules; automatically check and decrease a configurable "wild shape" resource    
     * change the token size
     * set hp/ac/speed on bar1/2/3 when you shapeshift
     * setup senses (e.g. light, vision) from darkvision/blindsight info on NPCs, can set defaults and overrides per shape
@@ -29,16 +29,14 @@ Here is an example with the before an after clicking on the "Tiger" button, with
 ![3usage](https://github.com/ocangelo/roll20/blob/master/WildShape/images/3-usage.JPG)
 
 # Notes
-**IMPORTANT** You should always make copies of the characters for your target shapes, one for each ShapeShifter that will be able to transform into that shape, as attributes and other settings on the characters might be changed when they transform into it.
-
-For instance if you have 2 PCs and 1 NPC being able to transform into a "Giant Toad", you will want to have three separate copies of the "Giant Toad" character, one for each PC and one for the NPC.
-
 **IMPORTANT** There is a limitation on using images directly from the marketplace, whenever you want to use a monster from the Monster Manual (or similar external resource in your compendium) the API might give you an error asking you to reupload the avatar when you try to transform into it, it's really hit or miss so i would suggest you try it first but in case you do get the error to fix it you will need to:
 
-* open up the character sheet (that hopefully you duplicated, let's say "Copy of Black Dragon")
+* open up the character sheet (let's say "Black Dragon")
 * save the avatar image on your PC (e.g. open the avatar image -> right click -> save as)
 * upload that file to the library
-* change the avatar on the "Copy of Black Dragon" character sheet to the file you uploaded to the library
+* change the avatar on the "Black Dragon" character sheet to the file you uploaded to the library (if you can prefer you can set the token)
+
+**IMPORTANT**: Right now I am using the token names to find shifters when they try to shapeshift, if you change it in your game you will have to edit it in the shifter settings otherwise they won't be able to transform anymore
 
 # Known Issues
 * after shapeshifting you need to reselect your token to refresh the values in the token bars
@@ -47,9 +45,7 @@ For instance if you have 2 PCs and 1 NPC being able to transform into a "Giant T
 # Wishlist
 Things i would like to add in future if i have time:
 * some sort of categorization to the shape list, maybe player-created so they can split/organize the list shown when they try to shapeshift in any way they want (right now it's alphabetical)
-* see if i can copy saves/skills/proficiencies from druids to npcs
 * adding some sort of json import/export for shifters and/or shape lists
-* add an automatic "duplicate & rename pc/npc" when adding new shapes
 
 # Help
 
@@ -74,13 +70,9 @@ the Edit Shifter brings you to this menu where you can add shifters simply by cl
 
 Editing a shifter you can assign a different token name to it, change which character (base shape) it's linked to, and then you have a list of available shapes that you can add from drop downs (that will show either all PCs or all NPCs), or you can do a **mass import from a folder (more on this later)**
 
-**IMPORTANT**: right now i am using the token names to find shifters when they try to shapeshift, if you change it in your game you will have to edit it in the shifter settings
-
 ![6-editShifter](https://github.com/ocangelo/roll20/blob/master/WildShape/images/6-editShifter.JPG)
 
-each shape has an optional "simple name" and a character associated to it, the simple name will be the one displayed on the list of available shapes when shapeshifting, if they match changing the character will automatically change the name as well.
-
-here you can also override the size of the target shape if you want to (it will show you a drop down with normal/large/huge/gargantuan options)
+Each shape can override the name displayed in the list, as well as senses and the size of the target shape (it will show you a drop down with normal/large/huge/gargantuan options)
 
 ![7-editShape](https://github.com/ocangelo/roll20/blob/master/WildShape/images/7-editShape.JPG)
 
@@ -88,19 +80,19 @@ here you can also override the size of the target shape if you want to (it will 
 
 Something that i wanted to avoid was to add shapes one by one for my druid, so i created a way to import ALL shapes from a given folder.
 
-You can do that by clicking on the "Import Shapes from Folder" in the "edit shifter" menu, my workflow was to duplicate a bunch of monsters and organize them in different folders
+You can do that by clicking on the "Import Shapes from Folder" in the "edit shifter" menu, my workflow was to duplicate a bunch of monsters and organize them in different folders.
+
+Please keep in mind that this process might take a while to duplicate all characters, i tested importing 18 shapes and it took a little over a minute.
 
 you will be prompted with:
 
 * a folder name (e.g. "lbpyp/wild shape/flying", is not case sensitive and you can use either \ or / to separate your path)
 * if you want to include characters found in subfolders (e.g. yes)
 * if you want to remove a prefix (e.g. "Copy of " that is automatically added when you duplicate a character)
-* if you want to add a new prefix (e.g. "Zana - ", i like to add the character name so i can easily find their shapes)
-* if you want to add the prefix to the "simple name" (e.g. "no", this way the list shown to the player and in the config will just have the shape name, like "eagle" while pointing to the character "zana - eagle")
 
-
-So in the screenshot below i had initially all the monsters duplicated with the "copy of " in front of them, i clicked on the import button and all shapes were renamed, added to my shapeshifter list, and also added to my player journal.
+So in the screenshot below i had initially all the original monsters organized in folders, i clicked on the import button and all characters where duplicated, shapeswere added to my shapeshifter list, and also added to my player journal.
 
 In future i can just run the same thing on the "flying" or "swimming" folder i already have prepared and they will get access to all those shapes
 
 ![8-importFolder](https://github.com/ocangelo/roll20/blob/master/WildShape/images/8-importFolder.JPG)
+![8-importFolder-results](https://github.com/ocangelo/roll20/blob/master/WildShape/images/8-importFolder-results.JPG)

@@ -1,11 +1,15 @@
+/* 
+original script from: https://github.com/ocangelo/roll20
+*/
+
 /*jshint -W069 */
 /*jshint -W014 */
 /*jshint -W083 */
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.2.6",
-    REQUIRED_HELPER_VERSION: "1.2.2",
+    VERSION : "1.3",
+    REQUIRED_HELPER_VERSION: "1.3",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -63,6 +67,7 @@ const WS_API = {
         SEP: "###",              // separator used in commands
 
         DRUID_WS_RES : "wild shape",
+        MUTE_SHIFT: false,
 
         PC_DATA : {
             HP: "hp",
@@ -144,8 +149,10 @@ const WS_API = {
         MAKEROLLPUBLIC: "makerollpublic",
         ISNPC: "isnpc",
         CURRENT_SHAPE: "currshape",
+        ISDUPLICATE: "isDuplicate",
         
         DRUID_WS_RES: "DRUID_WS_RES",
+        MUTE_SHIFT: "MUTE_SHIFT",
 
         STATS_CACHE: {
             ROOT: "stats_cache",
@@ -196,6 +203,8 @@ const WS_API = {
 
     // major changes
     CHANGELOG : {
+        "1.3"   : "automatically duplicate/delete characters when adding/removing new shapes",
+        "1.2.6" : "added setting to mute players chat messages",
         "1.2.5" : "Wild Shape Resource added to config, automatically check and decrease when Druids transform",
         "1.2"   : "automatically add corrected saving throws and proficiencies for druids",
         "1.1"   : "automatically shapeshift tokens to the last shape when copied/dropped from the journal",
@@ -278,23 +287,23 @@ class WildShapeMenu extends WildMenu
         cmdEdit = cmdEdit + WS_API.FIELDS.SENSES.ROOT + this.SEP;
 
         let sensesDataList = [
-            this.makeListLabelValue(overrideName, settings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.OVERRIDE)
+            this.makeLabelValue(overrideName, settings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.OVERRIDE)
         ];
 
         if (shifterId && !config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
         {
-            sensesDataList.push(this.makeListLabel("NOTE: Current Config Write Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
+            sensesDataList.push(this.makeLabel("NOTE: Current Config Write Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
         }
 
         // senses settings
         _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, (attr) => {
             const currAttr = settings[WS_API.FIELDS.SENSES.ROOT][attr];
             
-            let attrField = this.makeListLabelValue(attr, currAttr);
+            let attrField = this.makeLabelValue(attr, currAttr);
             if (currAttr === false || currAttr === true) 
-                attrField = attrField + this.makeListButton("Toggle", cmdEdit + attr + this.SEP + WS_API.FIELDS.TOGGLE);
+                attrField = attrField + this.makeRightButton("Toggle", cmdEdit + attr + this.SEP + WS_API.FIELDS.TOGGLE);
             else
-                attrField = attrField + this.makeListButton("Edit", cmdEdit + attr + this.SEP + "?{Attribute|" + currAttr + "}");
+                attrField = attrField + this.makeRightButton("Edit", cmdEdit + attr + this.SEP + "?{Attribute|" + currAttr + "}");
         
             sensesDataList.push(attrField);
         });
@@ -321,14 +330,14 @@ class WildShapeMenu extends WildMenu
         }
 
         let listItems = [
-            this.makeListLabelValue("Name", shapeId) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.NAME + this.SEP + "?{Edit Name|" + shapeId + "}"),
-            this.makeListLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + npcs + "}"),
-            this.makeListLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
-            this.makeListLabelValue("Force Senses", obj[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
-            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
+            this.makeLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]),
+            this.makeLabelValue("Name", shapeId) + this.makeRightButton("Edit", cmdShapeEdit + WS_API.FIELDS.NAME + this.SEP + "?{Edit Name|" + shapeId + "}"),
+            this.makeLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeRightButton("Edit", cmdShapeEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
+            this.makeLabelValue("Force Senses", obj[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
-        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
+        const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure you want to delete " + shapeId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
         const editShifterButton = this.makeButton("Edit Shifter: " + shifterId, cmdShifterEdit, ' width: 100%');
 
         let contents = this.makeList(listItems) + '<hr>' + deleteShapeButton + '<hr>' + editShifterButton;
@@ -359,46 +368,49 @@ class WildShapeMenu extends WildMenu
         let listItems = [];
 
         let settingsDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Settings " + pcTag) + ":</b></p>",
-            this.makeListLabel("Token name needs to match to be able to shapeshift", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
-
-            this.makeListLabelValue("Token Name", shifterId) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.NAME + this.SEP + "&#64;{target|token_name}"),
-            this.makeListLabelValue(pcTag + " Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"),
-            this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
-            this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + WS_API.FIELDS.ISDRUID),
-            this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"),
-            this.makeListLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeListButton("Toggle", cmdShifterEdit + WS_API.FIELDS.MAKEROLLPUBLIC),
-            this.makeListLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"),
-            this.makeListLabelValue("Force Senses", shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
-            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
+            this.makeLabel("<p style='font-size: 120%'><b>Settings " + pcTag) + ":</b></p>",
+            this.makeLabelValue("Token Name", shifterId) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.NAME + this.SEP + "&#64;{target|token_name}"),
+            this.makeLabel("Token name needs to match to be able to shapeshift", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabelValue(pcTag + " Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"),
+            this.makeLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
+            this.makeLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeRightButton("Toggle", cmdShifterEdit + WS_API.FIELDS.ISDRUID),
+            this.makeLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"),
+            this.makeLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeRightButton("Toggle", cmdShifterEdit + WS_API.FIELDS.MAKEROLLPUBLIC),
+            this.makeLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"),
+            this.makeLabelValue("Force Senses", shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
         //listItems.push(this.makeList(settingsDataList, " padding-left: 10px"));
 
         // shapes section
         let shapesDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>") + this.makeListButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}" + this.SEP + "?{Simple Name (optional)}") + this.makeListButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}" + this.SEP + "?{Simple Name (optional)}")
+            this.makeLabel("<p style='font-size: 120%'><b>Shapes:</b></p>"),
         ];
 
         _.each(shifterShapes, (value, shapeId) =>
         {
-            shapesDataList.push(this.makeListLabel(shapeId) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeListButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
+            shapesDataList.push(this.makeLabel(shapeId) + this.makeRightButton("Del", cmdRemove + "?{Are you sure you want to delete " + shapeId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeRightButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
         });
         //listItems.push(this.makeList(shapesDataList, " padding-left: 10px"));
 
         // bottom buttons
-        const importShapesFromFolderButton = this.makeButton("Import Shapes from Folder", cmdImport + WS_API.FIELDS.TARGET.SHAPEFOLDER + this.SEP + shifterId + this.SEP + "?{Folder Name}" + this.SEP + "?{Find in Subfolders?|no|yes}" + this.SEP + "?{Remove Prefix (optional)}" + this.SEP + "?{Add Prefix (optional)}" + this.SEP + "?{Add Prefix to Simple Name?|no|yes}", ' width: 100%');
+        const shapeButtons =
+            "<table style='width: 100%'><tr><td>" + this.makeButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}", 'width: 100%') + "<td>" + this.makeButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}", 'width: 100%') + "</table>"
+            + this.makeButton("Import Shapes from Folder", cmdImport + WS_API.FIELDS.TARGET.SHAPEFOLDER + this.SEP + shifterId + this.SEP + "?{Folder Name}" + this.SEP + "?{Find in Subfolders?|no|yes}" + this.SEP + "?{Remove Prefix (optional)}", ' width: 100%')
+            + this.makeLabelComment("Adding a single shape may take a several seconds (around 4s), importing several shapes from a folder may take a while (e.g. 15 shapes should take around 1 minute); please wait until you see the results in the chat");
+
+        const deleteShapesButton = this.makeButton("Delete All Shapes", cmdRemove + "?{Are you sure you want to delete all shapes?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId, ' width: 100%');
         //const importShapesButton = this.makeButton("Import Shapes", cmdImport + WS_API.FIELDS.TARGET.SHAPE + this.SEP + "?{Shapes Data}", ' width: 100%');
         //const exportShapesButton = this.makeButton("Export Shapes", cmdExport + WS_API.FIELDS.TARGET.SHAPE, ' width: 100%');
         //const exportShifterButton = this.makeButton("Export Shifter", cmdExport + WS_API.FIELDS.TARGET.SHIFTER, ' width: 100%');
-        const deleteShifterButton = this.makeButton("Delete: " + shifterId, cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId, ' width: 100%');
+        const deleteShifterButton = this.makeButton("Delete Shifter: " + shifterId, cmdRemove + "?{Are you sure you want to delete the shifter?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId, ' width: 100%');
         const showShiftersButton = this.makeButton("Show ShapeShifters", this.CMD.ROOT + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
 
         //let contents = this.makeList(listItems) + importShapesFromFolderButton /*+ importShapesButton + exportShapesButton + exportShifterButton*/ + '<hr>' + deleteShifterButton + '<hr>' + showShiftersButton;
         let contents = this.makeList(settingsDataList)
-            + this.makeList(shapesDataList)
-            + importShapesFromFolderButton /*+ importShapesButton + exportShapesButton + exportShifterButton*/ 
-            + '<hr>' + deleteShifterButton 
+            + '<hr>' + this.makeList(shapesDataList) + shapeButtons /*+ importShapesButton + exportShapesButton + exportShifterButton*/ 
+            + '<hr>' + deleteShapesButton + deleteShifterButton 
             + '<hr>' + showShiftersButton;
         
         this.showMenu(WS_API.NAME, contents, WS_API.NAME + ': ' + shifterId);
@@ -413,7 +425,7 @@ class WildShapeMenu extends WildMenu
         let listItems = [];
         _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (value, shifterId) => {
             const shifterSettings = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId][WS_API.FIELDS.SETTINGS];
-            listItems.push(this.makeListLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeListButton("Edit", cmdShifterEdit + shifterId));
+            listItems.push(this.makeLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeRightButton("Del", cmdRemove + "?{Are you sure you want to delete " + shifterId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeRightButton("Edit", cmdShifterEdit + shifterId));
         });
 
         let pcs = this.UTILS.getPCNames().sort().join('|');
@@ -437,62 +449,66 @@ class WildShapeMenu extends WildMenu
         const showShiftersButton = this.makeButton("Edit ShapeShifters", apiCmdBase + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
         
         let otherSettingsList = [
-            this.makeListLabelValue("Commands Separator", this.SEP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
-            this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+            this.makeLabel("<p style='font-size: 120%'><b>Config:</b></p>"),
+            this.makeLabelValue("Commands Separator", this.SEP) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
+            this.makeLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
 
-            this.makeListLabelValue("WildShape Resource", config[WS_API.FIELDS.DRUID_WS_RES]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.DRUID_WS_RES + this.SEP + "?{Edit|" + config[WS_API.FIELDS.DRUID_WS_RES] + "}"),
-            this.makeListLabel("Automatically check and decrease resource for Druids (case insensitive)", "font-size: 80%"),
+            this.makeLabelValue("<br>WildShape Resource", config[WS_API.FIELDS.DRUID_WS_RES]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.DRUID_WS_RES + this.SEP + "?{Edit|" + config[WS_API.FIELDS.DRUID_WS_RES] + "}"),
+            this.makeLabel("Automatically check and decrease resource for Druids (case insensitive)", "font-size: 80%"),
+            this.makeLabelValue("Mute Shift Messages", config[WS_API.FIELDS.MUTE_SHIFT], 'false') + this.makeRightButton("Toggle", cmdConfigEdit + WS_API.FIELDS.MUTE_SHIFT),
+            this.makeLabel("Mute messages sent to players when shapeshifting", "font-size: 80%"),
+
         ];
 
         // token settings
         let tokenDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Token Data:</b></p>"),
-            this.makeListLabel("Automatically assign values to bars (HP needs to be assigned to one)", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>Token Data:</b></p>"),
+            this.makeLabel("Automatically assign values to bars (HP needs to be assigned to one)", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.HP + this.SEP + "?{Select a Bar|bar1|bar2|bar3}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.AC + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.SPEED + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.HP + this.SEP + "?{Select a Bar|bar1|bar2|bar3}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.AC + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.SPEED + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
                 ], " padding-left: 10px"),
         ];
 
         // PC settings
         let pcDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>PC Data:</b></p>"),
-            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>PC Data:</b></p>"),
+            this.makeLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP] + "}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC] + "}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED] + "}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP] + "}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC] + "}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED] + "}"),
                 ], " padding-left: 10px"),
         ];
 
         // NPC settings
         let npcDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>NPC Data:</b></p>"),
-            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>NPC Data:</b></p>"),
+            this.makeLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP] + "}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC] + "}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED] + "}"),
-                    this.makeListLabelValue("SENSES", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SENSES + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] + "}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP] + "}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC] + "}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED] + "}"),
+                    this.makeLabelValue("SENSES", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SENSES + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] + "}"),
                 ], " padding-left: 10px"),
         ];
 
         // senses settings
         let sensesDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Default Senses:</b></p>"),
-            this.makeListLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
-            this.makeListLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
+            this.makeLabel("<p style='font-size: 120%'><b>Default Senses:</b></p>"),
+            this.makeLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
         ];
 
         // finalization
-        const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET + this.SEP + "?{Are you sure?|no|yes}", ' width: 100%');
+        const resetButton = this.makeButton('Reset', this.CMD.CONFIG_RESET + this.SEP + "?{Are you sure you want to reset all configs?|no|yes}", ' width: 100%');
 
         let title_text = WS_API.NAME + " v" + WS_API.VERSION + ((newVersion) ? ': New Version Setup' : ': Config');
         let contents = showShiftersButton + '<hr>'
@@ -646,23 +662,6 @@ var WildShape = WildShape || (function() {
         return null;
     };
 
-    async function getDefaultTokenImage(character) {
-        let img = null;
-
-        // get token image
-        character.get('defaulttoken', function(defaulttoken) {
-            const dt = JSON.parse(defaulttoken);
-            img = dt ? UTILS.getCleanImgsrc(dt.imgsrc) : "";
-        });
-
-        while (img == null)
-        {
-            await UTILS.sleep(50);
-        }
-
-        return img;
-    }
-
     async function getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault) {
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
@@ -670,7 +669,6 @@ var WildShape = WildShape || (function() {
 
         let data = {};
         
-        let targetImg = "";
         let targetSize = 1;
 
         let hpName;
@@ -685,14 +683,6 @@ var WildShape = WildShape || (function() {
             hpName      = config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP];
             acName      = config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC];
             speedName   = config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED];
-
-            // get token image
-            targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
-            if (!targetImg || targetImg == "")
-            {
-                UTILS.chatErrorToPlayer(shiftData.who, "the NPC avatar needs to be re-uploaded into the library and set on the target character; cannot use marketplace link");
-                return null;
-            }
             
             // get token size
             targetSize =  getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
@@ -709,22 +699,6 @@ var WildShape = WildShape || (function() {
             acName      = config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC];
             speedName   = config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED];
 
-            // the get on _defaulttoken is async, need to wait on it
-            await getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
-                targetImg = img;
-
-                if (!targetImg || targetImg == "")
-                {
-                    targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
-
-                    if (!targetImg || targetImg == "")
-                    {
-                        UTILS.chatErrorToPlayer(shiftData.who, "cannot find token or avatar image for PC " + shiftData.targetCharacterId);
-                        return null;
-                    }
-                }
-            });
-
             // get token size
             targetSize = getCreatureSize(shifterSettings[WS_API.FIELDS.SIZE]);
             
@@ -733,8 +707,29 @@ var WildShape = WildShape || (function() {
                 targetSize = 1;
         }
 
+        // the get on _defaulttoken is async, need to wait on it
+        let targetImg = null;
+        await UTILS.getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
+            targetImg = img;
+
+            if (!targetImg || targetImg.trim() == "")
+            {
+                UTILS.debugChat("cannot find default token image, getting avatar image");
+                targetImg = UTILS.getCleanImgsrc(shiftData.targetCharacter.get('avatar'));
+
+                if (!targetImg || targetImg.trim() == "")
+                {
+                    UTILS.chatErrorToPlayer(shiftData.who, "cannot use image with marketplace link, the image needs to be re-uploaded into the library and set on the target character as either token or avatar image; character id = " + shiftData.targetCharacterId);
+                    targetImg = null;
+                }
+            }
+        });
+
+        if (!targetImg)
+            return null;
+
+        // setup other output data
         {
-            // setup other output data
             data.imgsrc = targetImg;
             data.characterId = shiftData.targetCharacterId;
             data.controlledby = shiftData.shifterControlledby;
@@ -1155,13 +1150,17 @@ var WildShape = WildShape || (function() {
         {
             let wsCurrent = wildShapeResource.get("current") - 1;
             wildShapeResource.set("current",  wsCurrent);
-            UTILS.chatToPlayer(shiftData.who, config[WS_API.FIELDS.DRUID_WS_RES] + " left: " + wsCurrent + " / " + wildShapeResource.get("max"));
+            
+            if (!config[WS_API.FIELDS.MUTE_SHIFT])
+            {
+                UTILS.chatToPlayer(shiftData.who, config[WS_API.FIELDS.DRUID_WS_RES] + " left: " + wsCurrent + " / " + wildShapeResource.get("max"));
+            }
         }
 
         return true;
     }
 
-    const addShapeToShifter = (config, shifter, shapeCharacter, shapeId = null, doSort = true) => {
+    async function addShapeToShifter(config, shifter, shapeCharacter, newCharacterName, shapeId = null, doSort = true) {
         const shapeName = shapeCharacter.get('name');
         if ((!shapeId) || (typeof shapeId !== 'string') || (shapeId.length == 0))
             shapeId = shapeName;
@@ -1172,10 +1171,22 @@ var WildShape = WildShape || (function() {
             return false;
         }
 
+        await UTILS.duplicateCharacter(shapeCharacter, newCharacterName)
+            .then(
+                function(newShapeCharacter) { shapeCharacter = newShapeCharacter; }
+            );
+
+        if(!shapeCharacter)
+        {
+            UTILS.chatError("cannot duplicate character, skipping: " + shapeId);
+            return false;
+        }
+
         let shape = {};
-        shape[WS_API.FIELDS.ID] = shapeCharacter.get('id');
-        shape[WS_API.FIELDS.CHARACTER] = shapeName;
+        shape[WS_API.FIELDS.ID] = shapeCharacter.get('_id');
+        shape[WS_API.FIELDS.CHARACTER] = newCharacterName;
         shape[WS_API.FIELDS.SIZE] = WS_API.SETTINGS.SHAPE_SIZE;
+        shape[WS_API.FIELDS.ISDUPLICATE] = true;
 
         cacheCharacterData(shape);
         copySenses(config, shape);
@@ -1196,7 +1207,7 @@ var WildShape = WildShape || (function() {
         }
 
         return true;
-    };
+    }
 
     const handleInputShift = (msg, args, config) => 
     {
@@ -1232,7 +1243,7 @@ var WildShape = WildShape || (function() {
                     }
 
                     doShapeShift(obj).then((ret) => {
-                        if (ret)
+                        if (ret && !config[WS_API.FIELDS.MUTE_SHIFT])
                         {
                             if (obj.targetShape)
                                 UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
@@ -1313,36 +1324,34 @@ var WildShape = WildShape || (function() {
         }
     };
 
-    const handleInputAddShape = (msg, args, config) => 
+    async function handleInputAddShape(msg, args, config) 
     {
         const shifterKey = args.shift();
-        const shapeName = args.shift();
-        let shapeKey = args.shift().trim();
-        if (shapeName && shapeName.length > 0)
+        let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
+        if (shifter)
         {
-            let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
-            if (shifter)
+            const shapeName = args.shift();
+            let shapeObj = findObjs({ type: 'character', name: shapeName })[0];
+            if(shapeObj)
             {
-                let shapeObj = findObjs({ type: 'character', name: shapeName });
-                if(shapeObj && shapeObj.length == 1)
-                {
-                    if(addShapeToShifter(config, shifter, shapeObj[0], shapeKey))
-                        MENU.showEditShifter(shifterKey);
-                }
-                else
-                {
-                    UTILS.chatError("Cannot find character [" + shapeName + "] in the journal");
-                }
+                let shapeCharacterName = shifterKey + " - " + shapeName;
+                await addShapeToShifter(config, shifter, shapeObj, shapeCharacterName).then( 
+                    (ret) => { if (ret) { MENU.showEditShifter(shifterKey); UTILS.chat("New shape added: " + shapeName); } } );
+
             }
             else
             {
-                UTILS.chatError("Trying to add shape to ShapeShifter " + shifterKey + " which doesn't exist");
-                MENU.showShifters();
+                UTILS.chatError("Cannot find character [" + shapeName + "] in the journal");
             }
         }
-    };
+        else
+        {
+            UTILS.chatError("Trying to add shape to ShapeShifter " + shifterKey + " which doesn't exist");
+            MENU.showShifters();
+        }
+    }
 
-    const handleInputRemoveShifter = (msg, args, config) => 
+    async function handleInputRemoveShifter(msg, args, config) 
     {
         const shifterKey = args.shift();
         if (shifterKey)
@@ -1351,14 +1360,7 @@ var WildShape = WildShape || (function() {
             {
                 let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
                 _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
-                    if (shape)
-                    {
-                        const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                        if (shapeCharacter)
-                        {
-                            shapeCharacter.set({controlledby: "", inplayerjournals: ""});
-                        }
-                    }
+                    removeShape(shape);
                 });
 
                 delete state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
@@ -1375,29 +1377,72 @@ var WildShape = WildShape || (function() {
         }
 
         MENU.showShifters();
+    }
+
+    const removeShape = (shape) =>
+    {
+        if (shape)
+        {
+            const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+            if (shapeCharacter)
+            {
+                // versions earlier than 1.3 don't have the automatic duplicate, preserve characters
+                if(shape[WS_API.FIELDS.ISDUPLICATE])
+                {
+                    shapeCharacter.remove();
+                }
+                else
+                {
+                    shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     };
 
-    const handleInputRemoveShape = (msg, args, config) => 
+    async function handleInputRemoveShape(msg, args, config)
     {
         const shifterKey = args.shift();
         const shapeKey = args.shift();
         let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
         if (shifter) 
         {
-            let shape = shifter[WS_API.FIELDS.SHAPES][shapeKey];
-            if (shape)
+            if (shapeKey)
             {
-                const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                if (shapeCharacter)
+                let shape = shifter[WS_API.FIELDS.SHAPES][shapeKey];
+                if (removeShape(shape))
                 {
-                    shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                    delete shifter[WS_API.FIELDS.SHAPES][shapeKey];
                 }
-
-                delete shifter[WS_API.FIELDS.SHAPES][shapeKey];
+                else
+                {
+                    UTILS.chatError("Trying to remove shape " + shapeKey + " that doesn't exist from ShapeShifter " + shifterKey);
+                }                
             }
             else
             {
-                UTILS.chatError("Trying to remove shape " + shapeKey + " that doesn't exist from ShapeShifter " + shifterKey);
+                // delete all shapes
+                _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
+                    const shapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
+                    if (shapeCharacter)
+                    {
+                        // versions earlier than 1.3 don't have the automatic duplicate, preserve characters
+                        if(shape[WS_API.FIELDS.ISDUPLICATE])
+                        {
+                            shapeCharacter.remove();
+                        }
+                        else
+                        {
+                            shapeCharacter.set({controlledby: "", inplayerjournals: ""});
+                        }
+                    }
+                });
+
+                delete shifter[WS_API.FIELDS.SHAPES][shapeKey];
+                shifter[WS_API.FIELDS.SHAPES] = {};
             }
 
             MENU.showEditShifter(shifterKey);
@@ -1407,7 +1452,7 @@ var WildShape = WildShape || (function() {
             UTILS.chatError("Trying to remove shape from ShapeShifter " + shifterKey + " which doesn't exist");
             MENU.showShifters();
         }
-    };
+    }
 
     const handleInputEditSenses = (msg, args, config, senses) => 
     {
@@ -1555,62 +1600,10 @@ var WildShape = WildShape || (function() {
                         }
 
                         MENU.showEditSenses(shifterKey, shapeKey);
-                        return;
                     }
                     else
                     {
-                        let isValueSet = false;
                         let newValue = args.shift();
-                        if(field == WS_API.FIELDS.CHARACTER)
-                        {
-                            // if we are renaming the shapeKey as well we need to make sure the new value won't point to an existing shape
-                            const oldCharacterName = shape[field];
-                            if (oldCharacterName !== shapeKey || !shifter[WS_API.FIELDS.SHAPES][newValue.trim()])
-                            {
-                                let shapeObj = findObjs({ type: 'character', name: newValue })[0];
-                                if(shapeObj)
-                                {
-                                    // clear old shape data
-                                    const oldShapeCharacter = findObjs({ type: 'character', id: shape[WS_API.FIELDS.ID] })[0];
-                                    if (oldShapeCharacter)
-                                    {
-                                        oldShapeCharacter.set({controlledby: "", inplayerjournals: ""});
-                                    }
-
-                                    // set new shape data
-                                    const shifterCharacter = findObjs({ type: 'character', id: shifter[WS_API.FIELDS.SETTINGS][WS_API.FIELDS.ID] })[0];
-                                    if (shifterCharacter)
-                                    {
-                                        const shifterControlledBy = shifterCharacter.get("controlledby");
-                                        shapeObj.set({controlledby: shifterControlledBy, inplayerjournals: shifterControlledBy});
-                                    }
-
-                                    shape[field] = newValue;
-                                    isValueSet = true;
-                                   
-                                    // set new shape id
-                                    shape[WS_API.FIELDS.ID] = shapeObj.get('id');
-                                    
-                                    // cache stats on the new shape
-                                    cacheCharacterData(shape);
-
-				    // also rename key if the name matches
-                                    if (oldCharacterName == shapeKey)
-                                    {
-                                        field = WS_API.FIELDS.NAME;
-                                    }
-                                }
-                                else
-                                {
-                                    UTILS.chatError("Cannot find character [" + newValue + "] in the journal");
-                                }
-                            }
-                            else
-                            {
-                                UTILS.chatError("Trying to add shape " + newValue + " which already exists");
-                                return;
-                            }
-                        }
 
                         if(field == WS_API.FIELDS.NAME)
                         {
@@ -1623,23 +1616,19 @@ var WildShape = WildShape || (function() {
                                     shifter[WS_API.FIELDS.SHAPES][shapeKey] = shape;
                                     delete shifter[WS_API.FIELDS.SHAPES][oldShapeKey];
                                     sortShapes(shifter);
-                                    isValueSet = true;
+                                    MENU.showEditShape(shifterKey, shapeKey);
                                 }
                                 else
                                 {
-                                    UTILS.chatError("Trying to add shape " + shapeKey + " which already exists");
-                                    shapeKey = oldShapeKey;
+                                    UTILS.chatError("Trying to rename shape to " + shapeKey + " which already exists");
                                 }
                             }
                         }
-                        else if(!isValueSet)
+                        else
                         {
                             shape[field] = newValue;
-                            isValueSet = true;
-                        }
-
-                        if (isValueSet)
                             MENU.showEditShape(shifterKey, shapeKey);
+                        }
                     }
                 }
                 else
@@ -1728,12 +1717,19 @@ var WildShape = WildShape || (function() {
                 config[WS_API.FIELDS.DRUID_WS_RES] = args.shift();
             }
             break;
+
+            case WS_API.FIELDS.MUTE_SHIFT:
+            {
+                config[WS_API.FIELDS.MUTE_SHIFT] = !config[WS_API.FIELDS.MUTE_SHIFT];
+            }
+            break;
+
         }
 
         MENU.showConfigMenu();
     };
 
-    const handleInputImportShapeFolder = (msg, args, config) => 
+    async function handleInputImportShapeFolder(msg, args, config) 
     {
         const shifterKey = args.shift();
         let shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterKey];
@@ -1741,56 +1737,54 @@ var WildShape = WildShape || (function() {
         {
             const folderName = args.shift();
             const searchSubfolders = args.shift() == 'yes';
-            const oldPrefix = args.shift();
-            const newPrefix = args.shift();
-            const noPrefixToId = args.shift() == 'no';
+            let removePrefix = args.shift();
+            if (removePrefix == "")
+                removePrefix = null;
 
             let folderShapes = UTILS.findCharactersInFolder(folderName, searchSubfolders);
             if(folderShapes)
             {
                 if (WS_API.DEBUG)
                 {
-                    _.each(folderShapes, function(shape) { UTILS.chat(JSON.stringify(shape)); });
+                    let debugShapeNames = "";
+                    _.each(folderShapes, function(shape) { debugShapeNames += shape.get("name") + ", "; });
+                    UTILS.chat("shapes found in input folder = " + debugShapeNames);
                 }
 
-                _.each(folderShapes, function(shape) {
+                UTILS.chat("start importing shapes...");
+                let importedShapes = 0;
+
+                for (let shapeIndex = folderShapes.length - 1; shapeIndex >= 0; --shapeIndex) {
+                    let shape = folderShapes[shapeIndex]; 
                     let shapeObj = findObjs({ type: 'character', id: shape.id })[0];                                                            
                     if (shapeObj)
                     {
-                        let shapeId = null;
-
-                        // rename
-                        let oldName = shapeObj.get("name");
-                        if(oldPrefix || newPrefix)
+                        let newName = shapeObj.get("name");
+                        if (removePrefix && newName.startsWith(removePrefix))
                         {
-                            let name = oldName;
-                            if(oldPrefix && name.startsWith(oldPrefix)) {
-                                name = name.slice(oldPrefix.length);
-                            }
-
-                            if (noPrefixToId)
-                            {
-                                shapeId = name;
-                            }
-
-                            if (newPrefix)
-                            {
-                                name = newPrefix + name;
-                            }
-
-                            shapeObj.set("name", name);
+                            newName = newName.slice(removePrefix.length);
                         }
 
+                        const shapeId = newName;
+                        newName = shifterKey + " - " + newName;
+
                         // add shape to shifter
-                        if(!addShapeToShifter(config, shifter, shapeObj, shapeId, false))
-                            shapeObj.set("name", oldName);
+                        await addShapeToShifter(config, shifter, shapeObj, newName, shapeId, false).then(
+                            (ret) => { if (ret) importedShapes += 1; });
                     }
-                });
+                }
 
-                sortShapes(shifter);
+                if (importedShapes > 0)
+                {
+                    sortShapes(shifter);
+                    MENU.showEditShifter(shifterKey);
+                    UTILS.chat("Imported " + importedShapes + "/" + folderShapes.length + " Shapes from folder [" + folderName + "]");
+                }
 
-                UTILS.chat("Importing Shapes from folder [" + folderName + "] completed");
-                MENU.showEditShifter(shifterKey);
+                if (importedShapes < folderShapes.length)
+                {
+                    UTILS.chat("Not all shapes were imported, please check for errors " + (importedShapes > 0 ? "above the menu" : ""));
+                }
             }
             else
             {
@@ -1802,7 +1796,7 @@ var WildShape = WildShape || (function() {
             UTILS.chatError("Trying to add shape to ShapeShifter " + shifterKey + " which doesn't exist");
             MENU.showShifters();
         }                                                
-    };
+    }
 
     const handleInput = (msg) => {
         if (msg.type === "api" && msg.content.indexOf(WS_API.CMD.ROOT) == 0)
@@ -1853,6 +1847,7 @@ var WildShape = WildShape || (function() {
                 }
                 else if (playerIsGM(msg.playerid))
                 {
+                    // GM ONLY COMMANDS
                     switch (cmd)
                     {
                         case WS_API.CMD.SHOW_SHIFTERS:
@@ -1907,7 +1902,6 @@ var WildShape = WildShape || (function() {
                                     setDefaults(true);
                                 }
                                 break;
-
 
                                 case WS_API.CMD.IMPORT:
                                 {
@@ -2045,12 +2039,24 @@ var WildShape = WildShape || (function() {
         config.VERSION = WS_API.VERSION;
     };
 
-    const setDefaults = (reset) => {
+    async function setDefaults(reset)
+    {
         let oldVersionDetected = null;
         let apiState = state[WS_API.STATENAME];
 
+
         if(!apiState || typeof apiState !== 'object' || reset)
         {
+            if(state[WS_API.STATENAME])
+            {
+                _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], 
+                    (shifter) => {
+                        _.each(shifter[WS_API.FIELDS.SHAPES], (shape) => {
+                            removeShape(shape);
+                        });
+                });                
+            }
+
             state[WS_API.STATENAME] = {};
             apiState = state[WS_API.STATENAME];
             reset = true;
@@ -2090,9 +2096,10 @@ var WildShape = WildShape || (function() {
                 UTILS.chat("New version detected, updated from " + oldVersionDetected + " to " + WS_API.VERSION);
             }
         }
-    };
+    }
 
-    const start = () => {
+    async function start()
+    {
         // check install
         if (!UTILS.VERSION || UTILS.compareVersion(UTILS.VERSION, WS_API.REQUIRED_HELPER_VERSION) < 0)
         {
@@ -2100,7 +2107,7 @@ var WildShape = WildShape || (function() {
             return;
         }
 
-        setDefaults();
+        await setDefaults();
 
         // register event handlers
         on('chat:message', handleInput);
@@ -2110,9 +2117,9 @@ var WildShape = WildShape || (function() {
             }, 100);
         });
 
-        log(WS_API.NAME + ' Ready!');
-        UTILS.chat("API Ready, command: " + WS_API.CMD.ROOT);
-    };
+        log(WS_API.NAME + ' v' + WS_API.VERSION + " Ready! WildUtils v" + UTILS.VERSION);
+        UTILS.chat("API v" + WS_API.VERSION + " Ready! command: " + WS_API.CMD.ROOT);
+    }
     
     return {
         start
