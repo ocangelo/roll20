@@ -1,10 +1,19 @@
+/* 
+original script from: https://github.com/ocangelo/roll20
+*/
+
+/* TODO:    
+    - delete shape characters on shifter remove and config reset
+    - disable DEBUG
+*/
+
 /*jshint -W069 */
 /*jshint -W014 */
 /*jshint -W083 */
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.2.6",
+    VERSION : "1.3",
     REQUIRED_HELPER_VERSION: "1.3",
 
     STATENAME : "WILDSHAPE",
@@ -63,6 +72,7 @@ const WS_API = {
         SEP: "###",              // separator used in commands
 
         DRUID_WS_RES : "wild shape",
+        MUTE_SHIFT: false,
 
         PC_DATA : {
             HP: "hp",
@@ -147,6 +157,7 @@ const WS_API = {
         ISDUPLICATE: "isDuplicate",
         
         DRUID_WS_RES: "DRUID_WS_RES",
+        MUTE_SHIFT: "MUTE_SHIFT",
 
         STATS_CACHE: {
             ROOT: "stats_cache",
@@ -279,23 +290,23 @@ class WildShapeMenu extends WildMenu
         cmdEdit = cmdEdit + WS_API.FIELDS.SENSES.ROOT + this.SEP;
 
         let sensesDataList = [
-            this.makeListLabelValue(overrideName, settings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.OVERRIDE)
+            this.makeLabelValue(overrideName, settings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Toggle", cmdEdit + WS_API.FIELDS.SENSES.OVERRIDE)
         ];
 
         if (shifterId && !config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
         {
-            sensesDataList.push(this.makeListLabel("NOTE: Current Config Write Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
+            sensesDataList.push(this.makeLabel("NOTE: Current Config Write Senses value is set to false, senses won't be applied", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"));
         }
 
         // senses settings
         _.each(WS_API.FIELDS.SENSES.LIGHT_ATTRS, (attr) => {
             const currAttr = settings[WS_API.FIELDS.SENSES.ROOT][attr];
             
-            let attrField = this.makeListLabelValue(attr, currAttr);
+            let attrField = this.makeLabelValue(attr, currAttr);
             if (currAttr === false || currAttr === true) 
-                attrField = attrField + this.makeListButton("Toggle", cmdEdit + attr + this.SEP + WS_API.FIELDS.TOGGLE);
+                attrField = attrField + this.makeRightButton("Toggle", cmdEdit + attr + this.SEP + WS_API.FIELDS.TOGGLE);
             else
-                attrField = attrField + this.makeListButton("Edit", cmdEdit + attr + this.SEP + "?{Attribute|" + currAttr + "}");
+                attrField = attrField + this.makeRightButton("Edit", cmdEdit + attr + this.SEP + "?{Attribute|" + currAttr + "}");
         
             sensesDataList.push(attrField);
         });
@@ -322,11 +333,11 @@ class WildShapeMenu extends WildMenu
         }
 
         let listItems = [
-            this.makeListLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]),
-            this.makeListLabelValue("Name", shapeId) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.NAME + this.SEP + "?{Edit Name|" + shapeId + "}"),
-            this.makeListLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShapeEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
-            this.makeListLabelValue("Force Senses", obj[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
-            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
+            this.makeLabelValue("Character", obj[WS_API.FIELDS.CHARACTER]),
+            this.makeLabelValue("Name", shapeId) + this.makeRightButton("Edit", cmdShapeEdit + WS_API.FIELDS.NAME + this.SEP + "?{Edit Name|" + shapeId + "}"),
+            this.makeLabelValue("Size", obj[WS_API.FIELDS.SIZE]) + this.makeRightButton("Edit", cmdShapeEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
+            this.makeLabelValue("Force Senses", obj[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit Senses", cmdShapeEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
         const deleteShapeButton = this.makeButton("Delete Shape", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId, ' width: 100%');
@@ -360,38 +371,37 @@ class WildShapeMenu extends WildMenu
         let listItems = [];
 
         let settingsDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Settings " + pcTag) + ":</b></p>",
-            this.makeListLabelValue("Token Name", shifterId) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.NAME + this.SEP + "&#64;{target|token_name}"),
-            this.makeListLabel("Token name needs to match to be able to shapeshift", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
-            this.makeListLabelValue(pcTag + " Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"),
-            this.makeListLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeListButton("Edit", cmdShifterEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
-            this.makeListLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeListButton("Toggle", cmdShifterEdit + WS_API.FIELDS.ISDRUID),
-            this.makeListLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"),
-            this.makeListLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeListButton("Toggle", cmdShifterEdit + WS_API.FIELDS.MAKEROLLPUBLIC),
-            this.makeListLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"),
-            this.makeListLabelValue("Force Senses", shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
-            this.makeListLabel("Override the auto/default senses applied", "font-size: 80%"),
+            this.makeLabel("<p style='font-size: 120%'><b>Settings " + pcTag) + ":</b></p>",
+            this.makeLabelValue("Token Name", shifterId) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.NAME + this.SEP + "&#64;{target|token_name}"),
+            this.makeLabel("Token name needs to match to be able to shapeshift", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabelValue(pcTag + " Character", shifterSettings[WS_API.FIELDS.CHARACTER]) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.CHARACTER + this.SEP + "?{Edit Character|" + shifterPcs + "}"),
+            this.makeLabelValue("Size", shifterSettings[WS_API.FIELDS.SIZE]) + this.makeRightButton("Edit", cmdShifterEdit + WS_API.FIELDS.SIZE + this.SEP + "?{Edit Size|" + this["SHAPE_SIZES"] + "}"),
+            this.makeLabelValue("Is Druid", shifterSettings[WS_API.FIELDS.ISDRUID], 'false') + this.makeRightButton("Toggle", cmdShifterEdit + WS_API.FIELDS.ISDRUID),
+            this.makeLabel("Is Druid automatically copies over INT/WIS/CHA attributes", "font-size: 80%"),
+            this.makeLabelValue("Override Roll Settings", shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC], 'false') + this.makeRightButton("Toggle", cmdShifterEdit + WS_API.FIELDS.MAKEROLLPUBLIC),
+            this.makeLabel("Automatically set to never whisper, toggle advantage", "font-size: 80%"),
+            this.makeLabelValue("Force Senses", shifterSettings[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit Senses", cmdShifterEdit + WS_API.FIELDS.SENSES.ROOT),
+            this.makeLabel("Override the auto/default senses applied", "font-size: 80%"),
         ];
 
         //listItems.push(this.makeList(settingsDataList, " padding-left: 10px"));
 
         // shapes section
         let shapesDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Shapes:</b></p>")
-            + this.makeListButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}") 
-            + this.makeListButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}")
+            this.makeLabel("<p style='font-size: 120%'><b>Shapes:</b></p>"),
         ];
 
         _.each(shifterShapes, (value, shapeId) =>
         {
-            shapesDataList.push(this.makeListLabel(shapeId) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeListButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
+            shapesDataList.push(this.makeLabel(shapeId) + this.makeRightButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId + this.SEP + shapeId) + this.makeRightButton("Edit", cmdShapeEdit + shifterId + this.SEP + shapeId));
         });
         //listItems.push(this.makeList(shapesDataList, " padding-left: 10px"));
 
         // bottom buttons
-        const importShapesFromFolderButton =
-            this.makeButton("Import Shapes from Folder", cmdImport + WS_API.FIELDS.TARGET.SHAPEFOLDER + this.SEP + shifterId + this.SEP + "?{Folder Name}" + this.SEP + "?{Find in Subfolders?|no|yes}" + this.SEP + "?{Remove Prefix (optional)}", ' width: 100%')
-            + this.makeListLabel("Importing shapes may take a while, please wait until you see the result in the chat", "font-size: 80%; padding-left: 10px; padding-bottom: 10px");
+        const shapeButtons =
+            "<table style='width: 100%'><tr><td>" + this.makeButton("Add NPC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + npcs + "}", 'width: 100%') + "<td>" + this.makeButton("Add PC", cmdShapeAdd + shifterId + this.SEP + "?{Target Shape|" + pcs + "}", 'width: 100%') + "</table>"
+            + this.makeButton("Import Shapes from Folder", cmdImport + WS_API.FIELDS.TARGET.SHAPEFOLDER + this.SEP + shifterId + this.SEP + "?{Folder Name}" + this.SEP + "?{Find in Subfolders?|no|yes}" + this.SEP + "?{Remove Prefix (optional)}", ' width: 100%')
+            + this.makeLabelComment("Adding a single shape may take a few seconds, importing several may take a while; please wait until you see the result in the chat");
 
         const deleteShapesButton = this.makeButton("Delete All Shapes", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHAPE + this.SEP + shifterId, ' width: 100%');
         //const importShapesButton = this.makeButton("Import Shapes", cmdImport + WS_API.FIELDS.TARGET.SHAPE + this.SEP + "?{Shapes Data}", ' width: 100%');
@@ -402,7 +412,7 @@ class WildShapeMenu extends WildMenu
 
         //let contents = this.makeList(listItems) + importShapesFromFolderButton /*+ importShapesButton + exportShapesButton + exportShifterButton*/ + '<hr>' + deleteShifterButton + '<hr>' + showShiftersButton;
         let contents = this.makeList(settingsDataList)
-            + '<hr>' + this.makeList(shapesDataList) + importShapesFromFolderButton /*+ importShapesButton + exportShapesButton + exportShifterButton*/ 
+            + '<hr>' + this.makeList(shapesDataList) + shapeButtons /*+ importShapesButton + exportShapesButton + exportShifterButton*/ 
             + '<hr>' + deleteShapesButton + deleteShifterButton 
             + '<hr>' + showShiftersButton;
         
@@ -418,7 +428,7 @@ class WildShapeMenu extends WildMenu
         let listItems = [];
         _.each(state[WS_API.STATENAME][WS_API.DATA_SHIFTERS], (value, shifterId) => {
             const shifterSettings = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId][WS_API.FIELDS.SETTINGS];
-            listItems.push(this.makeListLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeListButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeListButton("Edit", cmdShifterEdit + shifterId));
+            listItems.push(this.makeLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeRightButton("Del", cmdRemove + "?{Are you sure?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeRightButton("Edit", cmdShifterEdit + shifterId));
         });
 
         let pcs = this.UTILS.getPCNames().sort().join('|');
@@ -442,59 +452,62 @@ class WildShapeMenu extends WildMenu
         const showShiftersButton = this.makeButton("Edit ShapeShifters", apiCmdBase + WS_API.CMD.SHOW_SHIFTERS, ' width: 100%');
         
         let otherSettingsList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Config:</b></p>"),
-            this.makeListLabelValue("Commands Separator", this.SEP) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
-            this.makeListLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
+            this.makeLabel("<p style='font-size: 120%'><b>Config:</b></p>"),
+            this.makeLabelValue("Commands Separator", this.SEP) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.SEP + this.SEP + "?{New Separator}"),
+            this.makeLabel("Please make sure your names/strings don't include the separator used by the API", "font-size: 80%"),
 
-            this.makeListLabelValue("<br>WildShape Resource", config[WS_API.FIELDS.DRUID_WS_RES]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.DRUID_WS_RES + this.SEP + "?{Edit|" + config[WS_API.FIELDS.DRUID_WS_RES] + "}"),
-            this.makeListLabel("Automatically check and decrease resource for Druids (case insensitive)", "font-size: 80%"),
+            this.makeLabelValue("<br>WildShape Resource", config[WS_API.FIELDS.DRUID_WS_RES]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.DRUID_WS_RES + this.SEP + "?{Edit|" + config[WS_API.FIELDS.DRUID_WS_RES] + "}"),
+            this.makeLabel("Automatically check and decrease resource for Druids (case insensitive)", "font-size: 80%"),
+            this.makeLabelValue("Mute Shift Messages", config[WS_API.FIELDS.MUTE_SHIFT], 'false') + this.makeRightButton("Toggle", cmdConfigEdit + WS_API.FIELDS.MUTE_SHIFT),
+            this.makeLabel("Mute messages sent to players when shapeshifting", "font-size: 80%"),
+
         ];
 
         // token settings
         let tokenDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Token Data:</b></p>"),
-            this.makeListLabel("Automatically assign values to bars (HP needs to be assigned to one)", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>Token Data:</b></p>"),
+            this.makeLabel("Automatically assign values to bars (HP needs to be assigned to one)", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.HP + this.SEP + "?{Select a Bar|bar1|bar2|bar3}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.AC + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.SPEED + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.HP + this.SEP + "?{Select a Bar|bar1|bar2|bar3}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.AC + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.TOKEN_DATA.ROOT][WS_API.FIELDS.TOKEN_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TOKEN_DATA.ROOT + this.SEP + WS_API.FIELDS.TOKEN_DATA.SPEED + this.SEP + "?{Select a Bar|none|bar1|bar2|bar3}"),
                 ], " padding-left: 10px"),
         ];
 
         // PC settings
         let pcDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>PC Data:</b></p>"),
-            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>PC Data:</b></p>"),
+            this.makeLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP] + "}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC] + "}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED] + "}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.HP] + "}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.AC] + "}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.PC_DATA.ROOT + this.SEP + WS_API.FIELDS.PC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED] + "}"),
                 ], " padding-left: 10px"),
         ];
 
         // NPC settings
         let npcDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>NPC Data:</b></p>"),
-            this.makeListLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabel("<p style='font-size: 120%'><b>NPC Data:</b></p>"),
+            this.makeLabel("Attributes on sheets used to link to the data", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
 
             this.makeList(
                 [ 
-                    this.makeListLabelValue("HP", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP] + "}"),
-                    this.makeListLabelValue("AC", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC] + "}"),
-                    this.makeListLabelValue("SPEED", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED] + "}"),
-                    this.makeListLabelValue("SENSES", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES]) + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SENSES + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] + "}"),
+                    this.makeLabelValue("HP", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.HP + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.HP] + "}"),
+                    this.makeLabelValue("AC", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.AC + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.AC] + "}"),
+                    this.makeLabelValue("SPEED", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SPEED + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SPEED] + "}"),
+                    this.makeLabelValue("SENSES", config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES]) + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.NPC_DATA.ROOT + this.SEP + WS_API.FIELDS.NPC_DATA.SENSES + this.SEP + "?{Attribute|" + config[WS_API.FIELDS.NPC_DATA.ROOT][WS_API.FIELDS.NPC_DATA.SENSES] + "}"),
                 ], " padding-left: 10px"),
         ];
 
         // senses settings
         let sensesDataList = [
-            this.makeListLabel("<p style='font-size: 120%'><b>Default Senses:</b></p>"),
-            this.makeListLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
-            this.makeListLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeListButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
+            this.makeLabel("<p style='font-size: 120%'><b>Default Senses:</b></p>"),
+            this.makeLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+            this.makeLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT)
         ];
 
         // finalization
@@ -1140,7 +1153,11 @@ var WildShape = WildShape || (function() {
         {
             let wsCurrent = wildShapeResource.get("current") - 1;
             wildShapeResource.set("current",  wsCurrent);
-            UTILS.chatToPlayer(shiftData.who, config[WS_API.FIELDS.DRUID_WS_RES] + " left: " + wsCurrent + " / " + wildShapeResource.get("max"));
+            
+            if (!config[WS_API.FIELDS.MUTE_SHIFT])
+            {
+                UTILS.chatToPlayer(shiftData.who, config[WS_API.FIELDS.DRUID_WS_RES] + " left: " + wsCurrent + " / " + wildShapeResource.get("max"));
+            }
         }
 
         return true;
@@ -1228,7 +1245,7 @@ var WildShape = WildShape || (function() {
                     }
 
                     doShapeShift(obj).then((ret) => {
-                        if (ret)
+                        if (ret && !config[WS_API.FIELDS.MUTE_SHIFT])
                         {
                             if (obj.targetShape)
                                 UTILS.chatAs(obj.shifterCharacter.get("id"), "Transforming into " + shapeName, null, null);
@@ -1321,7 +1338,8 @@ var WildShape = WildShape || (function() {
             {
                 let shapeCharacterName = shifterKey + " - " + shapeName;
                 await addShapeToShifter(config, shifter, shapeObj, shapeCharacterName).then( 
-                    (ret) => { if (ret) MENU.showEditShifter(shifterKey);} );
+                    (ret) => { if (ret) { MENU.showEditShifter(shifterKey); UTILS.chat("New shape added: " + shapeName); } } );
+
             }
             else
             {
@@ -1698,6 +1716,13 @@ var WildShape = WildShape || (function() {
                 config[WS_API.FIELDS.DRUID_WS_RES] = args.shift();
             }
             break;
+
+            case WS_API.FIELDS.MUTE_SHIFT:
+            {
+                config[WS_API.FIELDS.MUTE_SHIFT] = !config[WS_API.FIELDS.MUTE_SHIFT];
+            }
+            break;
+
         }
 
         MENU.showConfigMenu();

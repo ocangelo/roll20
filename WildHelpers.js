@@ -47,13 +47,15 @@ class WildUtils {
        this.chatError("chatErrorToPlayer: " + who + ", msg: " + msg);
     }
     
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     // returns:
     // 1: versionA > versionB
     // 0: versionA == versionB
     // -1: versionA < versionB
-    compareVersion(versionA, versionB)
-    {
-
+    compareVersion(versionA, versionB) {
         if (typeof versionA !== 'object') { versionA = versionA.toString().split('.'); }
         if (typeof versionB !== 'object') { versionB = versionB.toString().split('.'); }
 
@@ -87,10 +89,6 @@ class WildUtils {
         }
         return "";
     } 
-
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 
     sortByKey(unordered) {
         let ordered = {};
@@ -246,9 +244,10 @@ class WildUtils {
     }
 
     // finds the folder 'name' anywhere in the journal
-    findInNestedFolder(folderData, name) {
+    findNestedFolder(folderData, folderName) {
+        folderName = folderName.toLowerCase();
+
         let folderStack = [folderData];
-        
         let currFolder = folderStack.shift();
         while (currFolder)
         {
@@ -258,7 +257,8 @@ class WildUtils {
                 obj = currFolder.shift();
                 if (obj && _.isObject(obj))
                 {
-                    if (obj.n.toLowerCase() === name.toLowerCase()) {
+                    if (obj.n.toLowerCase() === folderName)
+                    {
                         return obj;
                     }
                     else
@@ -275,7 +275,7 @@ class WildUtils {
         return null;
     }
 
-    // finds the folder 'name' anywhere in the journal
+    // finds the folder fullpath in the journal
     findFolder(folderData, fullpath) {
         let currFolder = folderData;
 
@@ -408,7 +408,7 @@ class WildUtils {
     async duplicateCharacter(targetCharacter, newCharacterName) {
         if (!targetCharacter)
         {
-            this.chatError("trying to duplicate invalid character");
+            this.chatError("WildUtils::duplicateCharacter: trying to duplicate an invalid character");
             return null;
         }
 
@@ -417,32 +417,81 @@ class WildUtils {
         const jsonObj = (o) => JSON.parse(JSON.stringify(o));
 
         // create new character
-        let newSimpleCharacter = jsonObj(targetCharacter);
-        delete newSimpleCharacter._id;
-        newSimpleCharacter.name = newCharacterName;
-        newSimpleCharacter.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
+        let newCharacterData = jsonObj(targetCharacter);
+        delete newCharacterData._id;
+        newCharacterData.name = newCharacterName;
+        newCharacterData.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
 
-        // setup token
-        let newCharacter = createObj('character', newSimpleCharacter);
-    
+        let newCharacter = createObj('character', newCharacterData);
+        let newCharacterId = newCharacter.get("_id");
+
+        // find character token
+        let characterToken = null;
+        let tokenLinks = ["", "", ""];
+        let tokenLinksAttr = ["", "", ""];
+        await this.getDefaultToken(targetCharacter).then( (token) => { characterToken = token; });
+        if (characterToken)
+        {
+            // make a copy of the data and create a new off screen temporary graphic token
+            characterToken = jsonObj(characterToken);
+            characterToken._pageid = Campaign().get("playerpageid");
+            characterToken.layer = "gmlayer";
+            characterToken.left = -500;
+            characterToken.top = -500;
+            characterToken.imgsrc = this.getCleanImgsrc(characterToken.imgsrc);
+
+            characterToken = createObj("graphic", characterToken);
+            if (characterToken)
+            {
+                characterToken.set("represents", newCharacterId);
+
+                // cache link info
+                for (let i = 0; i < 3; ++i)
+                {
+                    let linkData = characterToken.get("bar" + (i + 1).toString() + "_link");
+                    if (linkData && linkData !== "")
+                    {
+                        let linkAttr = getObj("attribute", linkData);
+                        if (linkAttr)
+                        {
+                            tokenLinks[i] = linkData;
+                            tokenLinksAttr[i] = linkAttr.get("name");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                this.chatError("WildUtils::duplicateCharacter: cannot create a new graphic token");
+            }
+        }
+
         // copy attributes
         _.each(findObjs({type:'attribute', characterid: targetCharId}), (attr) => {
-            let simpleAttr = jsonObj(attr);
-            delete simpleAttr._id;
-            delete simpleAttr._type;
-            delete simpleAttr._characterid;
-            simpleAttr._characterid = newCharacter.id;
-            createObj('attribute', simpleAttr);
+            let attrData = jsonObj(attr);
+            delete attrData._id;
+            delete attrData._type;
+            attrData._characterid = newCharacterId;
+            let newAttr = createObj('attribute', attrData);
+
+            // check if we need to link the token to the new attribute
+            if (characterToken)
+            {
+                let linkIndex = tokenLinksAttr.findIndex(elem => elem == attrData.name);
+                if (linkIndex >= 0)
+                {
+                    characterToken.set( "bar" + (linkIndex + 1).toString() + "_link", newAttr.id);
+                }
+            }
         });
 
         // copy abilities
         _.each(findObjs({type:'ability', characterid: targetCharId}), (ability) => {
-            let simpleAbility = jsonObj(ability);
-            delete simpleAbility._id;
-            delete simpleAbility._type;
-            delete simpleAbility._characterid;
-            simpleAbility._characterid = newCharacter.id;
-            createObj('ability', simpleAbility);
+            let abilityData = jsonObj(ability);
+            delete abilityData._id;
+            delete abilityData._type;
+            abilityData._characterid = newCharacterId;
+            createObj('ability', abilityData);
         });
 
         targetCharacter.get("bio", function(bio) {
@@ -455,39 +504,16 @@ class WildUtils {
                 newCharacter.set('gmnotes', gmnotes); 
         });
 
-        let token = findObjs({type: 'graphic', subtype: "token", represents: targetCharId})[0];
-        if(token)
+        if (characterToken)
         {
-            if(token)
-            {
-                token.set("represents", newCharacter.get("_id"));
-                setDefaultTokenForCharacter(newCharacter, token);
-                token.set("represents", targetCharId);
-            }
-            else
-            {
-                this.debugChat("cannot find default token");
-            }
+            // this will make a snapshot of the current characterToken
+            setDefaultTokenForCharacter(newCharacter, characterToken);
+            characterToken.remove();
         }
 
-        this.chat( "Duplicated: " + targetCharacter.get("name") + " into " + newCharacter.get("name"));
+        this.debugChat("Duplicated: " + targetCharacter.get("name") + " into " + newCharacter.get("name"));
         return newCharacter;
     }
-
-    /* UNTESTED
-    findInFolder(name, folder) {
-        let objectsInFolder = this.findFolder(JSON.parse(Campaign().get('journalfolder')), folder);
-        if (objectsInFolder)
-        {
-            return _.find(objectsInFolder, (o) => o.n && o.n.toLowerCase() === name.toLowerCase()).i;
-        }
-        else
-        {
-            this.chatError("Cannot find folder: " + folder);
-            return null;
-        }
-    }
-    */
 }
 
 class WildMenu {
@@ -496,7 +522,7 @@ class WildMenu {
         this.MENU_STYLE = "overflow: hidden; background-color: #fff; border: 1px solid #000; padding: 5px; border-radius: 5px; ";
         this.BUTTON_STYLE = "background-color: #1b70e0; border: 1px solid #292929; border-radius: 3px; padding: 5px; color: #fff; text-align: center; ";
         this.LIST_STYLE = "list-style: none; padding: 0; margin: 0; margin-bottom: 10px; overflow:hidden; ";
-        this.ITEM_STYLE = "overflow:hidden;";
+        this.ITEM_STYLE = "overflow:hidden; padding-bottom: 5px; ";
     }
 
     makeTitle(title, title_tag) {
@@ -508,17 +534,21 @@ class WildMenu {
         return '<a style="'+ this.BUTTON_STYLE + addStyle + '" href="' + href + '" title="' + (alt || href) + '">' + title + '</a>';
     }
 
-    makeListLabel(itemName, addStyle) {
+    makeRightButton(buttonName, href, addStyle, alt) {
+        return this.makeButton(buttonName, href,  "float: right; " + addStyle, alt);
+    }
+
+    makeLabel(itemName, addStyle) {
         return '<span style="' + addStyle + '">' + itemName + '</span> ';
     }
 
-    makeListLabelValue(name, value, defaultValue = '', addStyle = null)
+    makeLabelValue(name, value, defaultValue = '', addStyle = null)
     {
-        return this.makeListLabel(name + ": &lt;" + (value || defaultValue) + "&gt;", addStyle);
+        return this.makeLabel(name + ": &lt;" + (value || defaultValue) + "&gt;", addStyle);
     }
 
-    makeListButton(buttonName, href, addStyle, alt) {
-        return this.makeButton(buttonName, href,  "float: right; " + addStyle, alt);
+    makeLabelComment(itemName, addStyle) {
+        return this.makeLabel(itemName, "font-size: 80%; padding-left: 10px; padding-bottom: 5px; " + addStyle);
     }
 
     makeList(items, addListStyle, addItemStyle) {
