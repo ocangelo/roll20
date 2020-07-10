@@ -9,7 +9,7 @@ After that you can copy the main WildShape script: https://github.com/ocangelo/r
 * can be used for both PC and NPC to shape shift into either a PC or an NPC
 * alt-double clicking on the "shape shifted" token will open the relative pc/npc sheet so that you can run actions from your new shape
 * automatically:
-	* DRUIDS ONLY: copy INT/WIS/CHA attributes to NPCs and set corrected saving throws and skills considering proficiencies according to 5e rules; automatically check and decrease a configurable "wild shape" resource    
+	* **DRUIDS ONLY**: copy INT/WIS/CHA attributes to NPCs and set corrected saving throws and skills considering proficiencies according to 5e rules; automatically check and decrease a configurable "wild shape" resource    
     * change the token size
     * set hp/ac/speed on bar1/2/3 when you shapeshift
     * setup senses (e.g. light, vision) from darkvision/blindsight info on NPCs, can set defaults and overrides per shape
@@ -80,9 +80,9 @@ Each shape can override the name displayed in the list, as well as senses and th
 
 Something that i wanted to avoid was to add shapes one by one for my druid, so i created a way to import ALL shapes from a given folder.
 
-You can do that by clicking on the "Import Shapes from Folder" in the "edit shifter" menu, my workflow was to duplicate a bunch of monsters and organize them in different folders.
+You can do that by clicking on the "Import Shapes from Folder" in the "edit shifter" menu, my workflow was to bring in a bunch of monsters from the compendium and  organize them in subfolders then mass import them.
 
-Please keep in mind that this process might take a while to duplicate all characters, i tested importing 18 shapes and it took a little over a minute.
+Please keep in mind that this process might take a while to duplicate all characters, I tested importing 18 shapes and it took a little over a minute.
 
 you will be prompted with:
 
@@ -93,6 +93,8 @@ you will be prompted with:
 So in the screenshot below i had initially all the original monsters organized in folders, i clicked on the import button and all characters where duplicated, shapeswere added to my shapeshifter list, and also added to my player journal.
 
 In future i can just run the same thing on the "flying" or "swimming" folder i already have prepared and they will get access to all those shapes
+
+The one downside is that unfortunately the duplicated characters will always be put at the bottom of your journal and there is no way of organizing their location through the API.
 
 ![8-importFolder](https://github.com/ocangelo/roll20/blob/master/WildShape/images/8-importFolder.JPG)
 ![8-importFolder-results](https://github.com/ocangelo/roll20/blob/master/WildShape/images/8-importFolder-results.JPG)
