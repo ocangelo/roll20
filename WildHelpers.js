@@ -3,7 +3,7 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.3";
+        this.VERSION = "1.3.1";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
     }
@@ -420,36 +420,9 @@ class WildUtils {
 
         const jsonObj = (o) => JSON.parse(JSON.stringify(o));
 
-        // find character token
-        let characterToken = null;
-        let tokenLinks = ["", "", ""];
-        let tokenLinksAttr = ["", "", ""];
-        await this.getDefaultToken(targetCharacter).then( (token) => { characterToken = token; });
-        if (characterToken)
-        {
-            // make a copy of the data and create a new off screen temporary graphic token
-            characterToken = jsonObj(characterToken);
-            characterToken.imgsrc = this.getCleanImgsrc(characterToken.imgsrc);
-            if(characterToken.imgsrc == "")
-            {
-                characterToken.imgsrc = this.getCleanImgsrc(targetCharacter.get("avatar"));
-                if(characterToken.imgsrc == "")
-                {
-                    this.chatError(errorMsgHeader + "cannot find image on either token or avatar; if it's using a marketplace link the image needs to be re-uploaded into the library and set on the target character as either token or avatar image");
-                    characterToken = null;
-                    return null;
-                }
-            }
-
-            // graphic token data setup
-            characterToken._pageid = Campaign().get("playerpageid");
-            characterToken.layer = "gmlayer";
-            characterToken.left = -500;
-            characterToken.top = -500;
-        }
-
         // create new character
         let newCharacterData = jsonObj(targetCharacter);
+        delete newCharacterData._defaulttoken;
         delete newCharacterData._id;
         newCharacterData.name = newCharacterName;
         newCharacterData.avatar = this.getCleanImgsrc(targetCharacter.get("avatar"));
@@ -457,47 +430,112 @@ class WildUtils {
         let newCharacter = createObj('character', newCharacterData);
         let newCharacterId = newCharacter.get("_id");
 
-        // create a copy of the character token
-        characterToken = createObj("graphic", characterToken);
-        if (characterToken)
+        // find character token and make a copy
+        let targetCharacterToken = null;
+        let newCharacterToken = null;
+        let tokenLinks = [null, null, null];
+           
+        await this.getDefaultToken(targetCharacter).then( (token) => { targetCharacterToken = token; });
+        if (targetCharacterToken)
         {
-            characterToken.set("represents", newCharacterId);
+            // make a copy of the data and create a new off screen temporary graphic token
+            let newCharacterTokenData = jsonObj(targetCharacterToken);
+
+            newCharacterTokenData.imgsrc = this.getCleanImgsrc(newCharacterTokenData.imgsrc);
+            if(newCharacterTokenData.imgsrc == "")
+            {
+                newCharacterTokenData.imgsrc = this.getCleanImgsrc(targetCharacter.get("avatar"));
+                if(newCharacterTokenData.imgsrc == "")
+                {
+                    this.chatError(errorMsgHeader + "cannot find image on either token or avatar; if it's using a marketplace link the image needs to be re-uploaded into the library and set on the target character as either token or avatar image");
+                    newCharacter.remove();
+                    return null;
+                }
+            }
+
+            // graphic token data setup
+            delete newCharacterTokenData._id;
+            newCharacterTokenData.represents = newCharacterId;
+            newCharacterTokenData._pageid = Campaign().get("playerpageid");
+            newCharacterTokenData.layer = "gmlayer";
+            newCharacterTokenData.left = -500;
+            newCharacterTokenData.top = -500;
 
             // cache link info
             for (let i = 0; i < 3; ++i)
             {
-                let linkData = characterToken.get("bar" + (i + 1).toString() + "_link");
-                if (linkData && linkData !== "")
+                let barName = "bar" + (i + 1).toString();
+                let linkId = newCharacterTokenData[barName + "_link"];
+                if (linkId && linkId !== "")
                 {
-                    let linkAttr = getObj("attribute", linkData);
+                    delete newCharacterTokenData[barName + "_link"];
+
+                    let linkAttr = getObj("attribute", linkId);
                     if (linkAttr)
                     {
-                        tokenLinks[i] = linkData;
-                        tokenLinksAttr[i] = linkAttr.get("name");
+                        let tmpTokenData = {};
+                        tmpTokenData.id = linkId;
+                        
+                        let val = newCharacterTokenData[barName + "_value"];                            
+                        if (!_.isUndefined(val))
+                        {
+                            tmpTokenData.value = val;
+                        }
+                        else
+                        {
+                            tmpTokenData.value = linkAttr.get("current");
+                            newCharacterTokenData[barName + "_value"] = tmpTokenData.value;
+                        }
+
+                        val = newCharacterTokenData[barName + "_max"];
+                        if (!_.isUndefined(val))
+                        {
+                            tmpTokenData.max = val;
+                        }
+                        else
+                        {
+                            tmpTokenData.max = linkAttr.get("max");
+                            newCharacterTokenData[barName + "_max"] = tmpTokenData.max;
+                        }
+
+                        tokenLinks[i] = tmpTokenData;
                     }
                 }
             }
-        }
-        else
-        {
-            this.chatError(errorMsgHeader + "cannot create a new graphic token");
+
+            // create new token
+            newCharacterToken = createObj("graphic", newCharacterTokenData);
+            if(!newCharacterToken)
+            {
+                this.chatError(errorMsgHeader + "cannot create a new graphic token");
+                newCharacter.remove();
+                return null;
+            }
         }
 
         // copy attributes
         _.each(findObjs({type:'attribute', characterid: targetCharId}), (attr) => {
             let attrData = jsonObj(attr);
+            let oldAttrId = attrData._id;
+
             delete attrData._id;
             delete attrData._type;
             attrData._characterid = newCharacterId;
             let newAttr = createObj('attribute', attrData);
 
             // check if we need to link the token to the new attribute
-            if (characterToken)
+            if (newCharacterToken)
             {
-                let linkIndex = tokenLinksAttr.findIndex(elem => elem == attrData.name);
-                if (linkIndex >= 0)
+                for (let linkIndex = 0; linkIndex < 3; ++linkIndex)
                 {
-                    characterToken.set( "bar" + (linkIndex + 1).toString() + "_link", newAttr.id);
+                    if (tokenLinks[linkIndex] !== null && tokenLinks[linkIndex].id ==  oldAttrId)
+                    {
+                        let barName = "bar" + (linkIndex + 1).toString();
+                        newCharacterToken.set(barName + "_link", newAttr.id);
+                        newCharacterToken.set(barName + "_max", tokenLinks[linkIndex].max);
+                        newCharacterToken.set(barName + "_value", tokenLinks[linkIndex].value);
+                        break;
+                    }
                 }
             }
         });
@@ -521,11 +559,11 @@ class WildUtils {
                 newCharacter.set('gmnotes', gmnotes); 
         });
 
-        if (characterToken)
+        if (newCharacterToken)
         {
             // this will make a snapshot of the current characterToken
-            setDefaultTokenForCharacter(newCharacter, characterToken);
-            characterToken.remove();
+            setDefaultTokenForCharacter(newCharacter, newCharacterToken);
+            newCharacterToken.remove();
         }
 
         this.debugChat("Duplicated: " + targetCharacterName + " into " + newCharacterName);
