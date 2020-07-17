@@ -9,7 +9,7 @@ original script from: https://github.com/ocangelo/roll20
 const WS_API = {
     NAME : "WildShape",
     VERSION : "1.3",
-    REQUIRED_HELPER_VERSION: "1.3",
+    REQUIRED_HELPER_VERSION: "1.3.1",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -1170,6 +1170,8 @@ var WildShape = WildShape || (function() {
             UTILS.chatError("Trying to add a shape with an ID that's already used, skipping: " + shapeId);
             return false;
         }
+
+        UTILS.chat("adding shape " + shapeId + ", please wait...");
 
         await UTILS.duplicateCharacter(shapeCharacter, newCharacterName)
             .then(
