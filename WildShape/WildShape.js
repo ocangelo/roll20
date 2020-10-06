@@ -1,5 +1,6 @@
 /* 
-original script from: https://github.com/ocangelo/roll20
+ * Roll20: https://app.roll20.net/users/6205674/angelo
+ * Github: https://github.com/ocangelo/roll20/
 */
 
 /*jshint -W069 */
@@ -8,8 +9,8 @@ original script from: https://github.com/ocangelo/roll20
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.3.1",
-    REQUIRED_HELPER_VERSION: "1.3.1",
+    VERSION : "1.3.2",
+    REQUIRED_HELPER_VERSION: "1.3.2",
 
     STATENAME : "WILDSHAPE",
     DEBUG : false,
@@ -750,7 +751,7 @@ var WildShape = WildShape || (function() {
             }
             else
             {
-                UTILS.chatErrorToPlayer(shiftData.who, "cannot find attribute [" + attrName + "] on character: " + shiftData.targetCharacterId);
+                UTILS.chatErrorToPlayer(shiftData.who, "setting value on token bar, cannot find attribute [" + attrName + "] on character: " + shiftData.targetCharacterId);
                 return false;
             }
         }
@@ -832,6 +833,16 @@ var WildShape = WildShape || (function() {
         If the creature has the same proficiency as you and the bonus in its stat block is higher than yours, use the creature’s bonus instead of yours. 
         */
         let shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName, _characterid: profData.shapeId})[0];
+        if (!shapeStatAttr)
+        {
+            shapeStatAttr = createObj('attribute', {
+                characterid: profData.shapeId,
+                name: profData.shapeStatName,
+                current: "",
+                max: ""
+            });
+        }
+
         if (shapeStatAttr)
         {
             // target could have proficiency in a stat we don't, default to that proficiency bonus
@@ -854,20 +865,12 @@ var WildShape = WildShape || (function() {
                 UTILS.debugChat("-- CHANGING -- " + profData.shapeStatName + " from " + oldShapeStatValue + " to: " + newShapeStatValue.toString(), false);
 
                 // also set _base value
-                shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.BASE, _characterid: profData.shapeId})[0];
-                if (shapeStatAttr)
-                {
-                    shapeStatAttr.set("current", (newShapeStatValue > 0 ? "+" : "") + newShapeStatValue.toString());
-                }                
+                UTILS.setAttribute(profData.shapeId, profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.BASE, (newShapeStatValue > 0 ? "+" : "") + newShapeStatValue.toString());
             }
 
             // set _flag value so that stats are forced to be displayed on NPCs
-            shapeStatAttr = findObjs({_type: "attribute", name: profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.FLAG, _characterid: profData.shapeId})[0];
-            if (shapeStatAttr)
-            {
-                shapeStatAttr.set("current", 1);
-            }  
-            }
+            UTILS.setAttribute(profData.shapeId, profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.FLAG, 1);
+        }
         else
         {
             UTILS.chatError("cannot find attribute " + profData.shapeStatName + " on shape " + profData.shapeId);
@@ -894,9 +897,9 @@ var WildShape = WildShape || (function() {
         UTILS.debugChat("copying druid attributes");
 
         _.each(STATS.DRUID_COPY_ATTR, function (attrName) {
-            UTILS.copyAttribute(druidCharacterId, attrName, targetCharacterId, attrName, false);
-            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.BASE, targetCharacterId, attrName + STATS.SUFFIX.BASE, false);
-            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.MOD, targetCharacterId, attrName + STATS.SUFFIX.MOD, false);
+            UTILS.copyAttribute(druidCharacterId, attrName, targetCharacterId, attrName, 10);
+            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.BASE, targetCharacterId, attrName + STATS.SUFFIX.BASE, 10);
+            UTILS.copyAttribute(druidCharacterId, attrName + STATS.SUFFIX.MOD, targetCharacterId, attrName + STATS.SUFFIX.MOD, "0");
         });
 
         // copy proficiencies
@@ -1085,10 +1088,10 @@ var WildShape = WildShape || (function() {
         // sometimes as a default values these attributes don't exist at all so we need to create them 
         if (shifterSettings[WS_API.FIELDS.MAKEROLLPUBLIC])
         {
-            UTILS.setAttribute(shiftData.targetCharacterId, "rtype", "@{advantagetoggle}", true);
-            UTILS.setAttribute(shiftData.targetCharacterId, "advantagetoggle", "{{query=1}} {{normal=1}} {{r2=[[0d20", true);
-            UTILS.setAttribute(shiftData.targetCharacterId, "wtype", "", true);
-            UTILS.setAttribute(shiftData.targetCharacterId, "dtype", "pick", true);
+            UTILS.setAttribute(shiftData.targetCharacterId, "rtype", "@{advantagetoggle}");
+            UTILS.setAttribute(shiftData.targetCharacterId, "advantagetoggle", "{{query=1}} {{normal=1}} {{r2=[[0d20");
+            UTILS.setAttribute(shiftData.targetCharacterId, "wtype", "");
+            UTILS.setAttribute(shiftData.targetCharacterId, "dtype", "pick");
         }
 
         // we need to turn bar visibility on if the target is controlled by a player

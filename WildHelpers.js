@@ -1,9 +1,13 @@
+/* 
+ * Roll20: https://app.roll20.net/users/6205674/angelo
+ * Github: https://github.com/ocangelo/roll20/WildHelpers.js
+*/
 /*jshint -W083 */
 
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.3.1";
+        this.VERSION = "1.3.2";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
     }
@@ -141,7 +145,7 @@ class WildUtils {
         return null;
     }
 
-    setAttribute(characterId, attrName, attrCurrent, createAttr = false, attrMax = null) {
+    setAttribute(characterId, attrName, attrCurrent, attrMax = null) {
         let targetAttr = findObjs({_type: "attribute", name: attrName, _characterid: characterId})[0];
         if (targetAttr)
         {
@@ -149,7 +153,7 @@ class WildUtils {
             if (attrMax)
                 targetAttr.set('max', attrMax);
         }
-        else if (createAttr)
+        else
         {
             targetAttr = createObj('attribute', {
                 characterid: characterId,
@@ -160,32 +164,25 @@ class WildUtils {
         }
     }
 
-    copyAttribute(fromId, fromAttrName, toId, toAttrName, onlyIfGreater = true, createAttr = false) {
+    copyAttribute(fromId, fromAttrName, toId, toAttrName, defaultValue = null) {
         let fromAttr = findObjs({type: 'attribute', characterid: fromId, name: fromAttrName})[0];
-        if (!fromAttr)
+        if (!fromAttr && !defaultValue)
         {
-            this.chatError("Cannot find attribute " + fromAttrName + " on character " + fromId);
+            this.chatError("Cannot copy missing attribute " + fromAttrName + " from character " + fromId);
             return;
         }
 
-        let fromAttrCurrent = fromAttr.get("current");
+        let fromAttrCurrent = fromAttr ? fromAttr.get("current") : defaultValue;
         let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
-            if(createAttr)
-            {
-                createObj('attribute', {
-                    characterid: toId,
-                    name: toName,
-                    current: fromAttrCurrent,
-                    max: fromAttr.get("max")
-                });
-            }
-            else
-            {
-                this.chatError("Cannot find attribute " + toAttrName + " on character " + toId);
-            }
+            createObj('attribute', {
+                characterid: toId,
+                name: toName,
+                current: fromAttrCurrent,
+                max: fromAttr.get("max")
+            });
         }
-        else if(!onlyIfGreater || toAttr.get("current") < fromAttrCurrent)
+        else
             toAttr.set("current", fromAttrCurrent);
     }
 
