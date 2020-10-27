@@ -9,7 +9,7 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.3.2",
+    VERSION : "1.3.3",
     REQUIRED_HELPER_VERSION: "1.3.2",
 
     STATENAME : "WILDSHAPE",
@@ -711,7 +711,7 @@ var WildShape = WildShape || (function() {
             speedName   = config[WS_API.FIELDS.PC_DATA.ROOT][WS_API.FIELDS.PC_DATA.SPEED];
 
             // get token size
-            targetSize = getCreatureSize(shifterSettings[WS_API.FIELDS.SIZE]);
+            targetSize = getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
             
             // auto defaults to normal on PCs
             if (targetSize == 0)
