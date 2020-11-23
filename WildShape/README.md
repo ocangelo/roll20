@@ -64,6 +64,12 @@ In the main menu you can enable/disable the feature and set the defaults in case
 
 ![9-writeSenses](https://github.com/ocangelo/roll20/blob/master/WildShape/images/9-writeSenses.JPG)
 
+In the PC/NPC Settings you can define some global settings applied to all PC/NPC Shifters.
+You will need to link some of the attributes (defaults for 5e are preconfigured) and then you can specify which attributes you want to link to bar 1/2/3 on the token as well as forcing some roll settings if you want to.
+For instance in my roll20 game settings page I have as a default on characters to always whisper, always roll advantage and always auto roll damage so that i am the only one seeing those things as a GM for NPCs; forcing those new settings in the WildShape "PC Settings" menu it will automatically make it so that when a PC player shapeshifts the target shape will never whisper, have a toggle for advantage and it will require a manual damage roll; leaving the settings to false means that it will use whatever the roll20 game settings are, so if I have an NPC shifter that I am controlling as a GM, I can make sure that I'll be the only one seeing its rolls even after it changes shape.
+
+![11-pcShifterSettings](https://github.com/ocangelo/roll20/blob/master/WildShape/images/11-pcShifterSettings.JPG)
+
 the Edit Shifter brings you to this menu where you can add shifters simply by clicking on their tokens (targeting), it will recognize if you are adding a PC or an NPC:
 
 ![5config](https://github.com/ocangelo/roll20/blob/master/WildShape/images/5-config.JPG)
