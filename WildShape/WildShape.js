@@ -11,11 +11,10 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.4.0",
-    REQUIRED_HELPER_VERSION: "1.3.2",
+    VERSION : "1.4.1",
+    REQUIRED_HELPER_VERSION: "1.3.3",
 
     STATENAME : "WILDSHAPE",
-    DEBUG : false,
 
     // storage in the state
     DATA_CONFIG : "config",
@@ -77,10 +76,11 @@ const WS_API = {
 
     // KEYS  in the config MUST match VALUES in the FIELDS object
     DEFAULT_CONFIG : {
-        SEP: "###",              // separator used in commands
+        SEP: " ---",              // separator used in commands
 
         DRUID_WS_RES : "",
         MUTE_SHIFT: false,
+        ENABLE_DEBUG: false,
 
         PC_DATA : {
             HP: "hp",
@@ -146,6 +146,7 @@ const WS_API = {
     // VALUES are used as KEYS for the CONFIG
     FIELDS : {
         SEP: "sep",
+        ENABLE_DEBUG: "enable_debug",
 
         // target of a command
         TARGET : {
@@ -153,6 +154,7 @@ const WS_API = {
             SHIFTER : "shifter",
             SHAPE : "shape",
             SHAPEFOLDER : "shapefolder",
+            CHAR_DATA: "charData",
         },
 
         SETTINGS: "settings",
@@ -181,13 +183,13 @@ const WS_API = {
 
         // global shifter character settings, stored separately for PC and NPC types
         CHAR_DATA: {
-            ROOT: "CHAR_DATA",
             PC_ROOT : "PC_DATA",
             NPC_ROOT : "NPC_DATA",
 
             HP: "HP",
-            HP_CACHE: "HP_CACHE",
             SPEED: "SPEED",
+
+            HP_CACHE: "HP_CACHE",
             SENSES: "SENSES",
 
             BAR_1: "bar1",
@@ -244,6 +246,7 @@ const WS_API = {
 
     // major changes
     CHANGELOG : {
+        "1.4.1" : "New option to enable debug chat/log, enabled auto size for PC sheets, changed default separator, plus a few more small fixes",
         "1.4"   : "Split Bar 1/2/3 setitngs and added overrides for different roll settings (toggle advantage, never whisper, auto roll damage)",
         "1.3"   : "automatically duplicate/delete characters when adding/removing new shapes",
         "1.2.6" : "added setting to mute players chat messages",
@@ -264,11 +267,15 @@ class WildShapeMenu extends WildMenu
 {
     constructor() {
         super();
+
+        let apiConfig = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+        this.UTILS = new WildUtils(WS_API.NAME, apiConfig[WS_API.FIELDS.ENABLE_DEBUG]);
     }
 
     updateConfig()
     {
-        this.SEP = state[WS_API.STATENAME][WS_API.DATA_CONFIG].SEP;
+        let apiConfig = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+        this.SEP = apiConfig.SEP;
         this.CMD = {};
         this.CMD.ROOT            = WS_API.CMD.ROOT + this.SEP;
         this.CMD.CONFIG          = this.CMD.ROOT + WS_API.CMD.CONFIG;
@@ -277,8 +284,8 @@ class WildShapeMenu extends WildMenu
         this.CMD.CONFIG_EDIT     = this.CMD.CONFIG + this.SEP + WS_API.CMD.EDIT + this.SEP;
         this.CMD.CONFIG_RESET    = this.CMD.CONFIG + this.SEP + WS_API.CMD.RESET;
 
-        this.UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
         this.SHAPE_SIZES = WS_API.SETTINGS.SHAPE_SIZES.join("|");
+        this.UTILS.debugEnable(apiConfig[WS_API.FIELDS.ENABLE_DEBUG]);
     }
 
     showEditSenses(shifterId = null, shapeId = null) {
@@ -363,7 +370,7 @@ class WildShapeMenu extends WildMenu
         let isNpc = dataRoot == WS_API.FIELDS.CHAR_DATA.NPC_ROOT;
         let menuTitle = (isNpc ? "NPC" : "PC") + " Settings";
 
-        let cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.CONFIG + this.SEP + WS_API.FIELDS.CHAR_DATA.ROOT + this.SEP + dataRoot + this.SEP;
+        let cmdEdit = this.CMD.CONFIG_EDIT + WS_API.FIELDS.TARGET.CONFIG + this.SEP + WS_API.FIELDS.TARGET.CHAR_DATA + this.SEP + dataRoot + this.SEP;
         let cmdToggle = this.SEP + WS_API.CMD.TOGGLE;
 
         // PC settings
@@ -392,7 +399,7 @@ class WildShapeMenu extends WildMenu
         ];
 
         let rollSettingsDataList = [
-            this.makeLabel("<p style='font-size: 120%'><b>Force Roll Settings:</b></p>"),
+            this.makeLabel("<p style='font-size: 120%'><b>: " (isNpc ? "NPC" : "PC") + " Shifters Force Roll Settings:</b></p>"),
             this.makeList(
                 [ 
                     this.makeLabelValue("Never Whisper", settings[WS_API.FIELDS.CHAR_DATA.FORCEROLL_NEVER_WHISPER], 'false') + this.makeRightButton("Toggle", cmdEdit + WS_API.FIELDS.CHAR_DATA.FORCEROLL_NEVER_WHISPER + cmdToggle),
@@ -554,15 +561,18 @@ class WildShapeMenu extends WildMenu
             this.makeLabelValue("Mute Shift Messages", config[WS_API.FIELDS.MUTE_SHIFT], 'false') + this.makeRightButton("Toggle", cmdConfigEdit + WS_API.FIELDS.MUTE_SHIFT),
             this.makeLabel("Mute messages sent to players when shapeshifting", "font-size: 80%"),
 
-            this.makeLabel("PC Settings") + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.CHAR_DATA.ROOT + this.SEP + WS_API.FIELDS.CHAR_DATA.PC_ROOT),
-            this.makeLabel("Global settings (attributes, rolls, etc.) for PC shifters", "font-size: 80%"),
+            this.makeLabel("PC Settings") + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TARGET.CHAR_DATA + this.SEP + WS_API.FIELDS.CHAR_DATA.PC_ROOT),
+            this.makeLabel("Global settings (attributes, rolls, etc.) for PC sheets", "font-size: 80%"),
 
-            this.makeLabel("NPC  Settings") + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.CHAR_DATA.ROOT + this.SEP + WS_API.FIELDS.CHAR_DATA.NPC_ROOT),
-            this.makeLabel("Global settings (attributes, rolls, etc.) for NPC shifters", "font-size: 80%"),
+            this.makeLabel("NPC  Settings") + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.TARGET.CHAR_DATA + this.SEP + WS_API.FIELDS.CHAR_DATA.NPC_ROOT),
+            this.makeLabel("Global settings (attributes, rolls, etc.) for NPC sheets", "font-size: 80%"),
 
             // senses settings
             this.makeLabelValue("Write Senses", config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE], 'false') + this.makeRightButton("Edit", cmdConfigEdit + WS_API.FIELDS.SENSES.ROOT),
             this.makeLabel("Write senses to token, defaults if data cannot be found", "font-size: 80%; padding-left: 10px; padding-bottom: 10px"),
+
+            this.makeLabelValue("Enable Debug Messages", config[WS_API.FIELDS.ENABLE_DEBUG], 'false') + this.makeRightButton("Toggle", cmdConfigEdit + WS_API.FIELDS.ENABLE_DEBUG),
+            this.makeLabel("Enable debug messages in the chat and in the API log", "font-size: 80%"),
         ];
         
         // finalization
@@ -601,7 +611,7 @@ class WildShapeMenu extends WildMenu
 var WildShape = WildShape || (function() {
     'use strict';
     let MENU = new WildShapeMenu();
-    let UTILS = new WildUtils(WS_API.NAME, WS_API.DEBUG);
+    let UTILS = new WildUtils(WS_API.NAME, state[WS_API.STATENAME][WS_API.DATA_CONFIG][WS_API.FIELDS.ENABLE_DEBUG]);
 
     const sortShifters = () => {
         // order shifters
@@ -682,6 +692,102 @@ var WildShape = WildShape || (function() {
         return WS_API.SETTINGS.SHAPE_SIZES_SCALE[targetSize ? Math.max(_.indexOf(WS_API.SETTINGS.SHAPE_SIZES, targetSize.toLowerCase()), 0) : 0];
     };
 
+    const getTokenBarData = (shifterSettings, targetCharacterId, isTargetDefault, isTargetNpc) => {
+        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+        let charDataRoot = config[isTargetNpc ? WS_API.FIELDS.CHAR_DATA.NPC_ROOT : WS_API.FIELDS.CHAR_DATA.PC_ROOT];
+
+        let hpAttr    = charDataRoot[WS_API.FIELDS.CHAR_DATA.HP];
+        let speedAttr = charDataRoot[WS_API.FIELDS.CHAR_DATA.SPEED];
+
+        let barData = {};
+
+        function getValue(fieldId)
+        {
+            let attrName = charDataRoot[fieldId];
+            if (attrName && attrName !== "")
+            {
+                let obj = findObjs({type: "attribute", characterid: targetCharacterId, name: attrName})[0];
+                if(obj)
+                {
+                    barData[fieldId] = {};
+                    barData[fieldId].id  = obj.id;
+                    barData[fieldId].max = obj.get('max');
+                    
+                    let currValue = obj.get('current');
+
+                    // HP SPECIAL HANDLING
+                    if (attrName == hpAttr)
+                    {
+                        if (isTargetDefault)
+                        {
+                            // NPC ShapeShifter don't store the current in hp and need special handling to restore hp when going back to original form
+                            if (shifterSettings[WS_API.FIELDS.ISNPC])
+                            {
+                                currValue = shifterSettings[WS_API.FIELDS.CHAR_DATA.HP_CACHE];
+                                if (!currValue)
+                                {
+                                    currValue = barData[fieldId].max;
+                                    UTILS.debugChat("cannot restore hp from HP CACHE, value not found; setting current hp to max");
+                                }
+                                else
+                                {
+                                    UTILS.debugChat("restoring " + currValue + " from HP_CACHE");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // always restore the max unless we are going back to the default Shape
+                            currValue = barData[fieldId].max;
+                        }
+                    }
+                    // SPEED SPECIAL HANDLING
+                    else if (attrName == speedAttr && ((!_.isNumber(currValue)) && currValue.indexOf(' ') > 0))
+                    {
+                        // "speed" can have multiple values, just display the first number/word before the space
+                        currValue = currValue.split(' ')[0];
+                    }
+
+                    // set value
+                    barData[fieldId].current = currValue;
+                }
+                else
+                {
+                    UTILS.chatError("setting value on token bar, cannot find attribute [" + attrName + "] on character: " + targetCharacterId);
+                }
+            }
+        }
+
+        getValue(WS_API.FIELDS.CHAR_DATA.BAR_1);
+        getValue(WS_API.FIELDS.CHAR_DATA.BAR_2);
+        getValue(WS_API.FIELDS.CHAR_DATA.BAR_3);
+
+        return barData;
+    };
+
+    const setTokenBarValues = (token, barData, controlledby) => {
+        function setValue(barKey)
+        {
+            if (barData[barKey])
+            {
+                token.set(barKey + "_link", barData[barKey].id ? barData[barKey].id : "");
+                token.set(barKey + "_value", barData[barKey].current ? barData[barKey].current : "");
+                token.set(barKey + "_max", barData[barKey].max ? barData[barKey].max : "");
+
+                // we need to turn bar visibility on if the target is controlled by a player
+                if (controlledby && controlledby.length > 0)
+                {
+                    token.set("showplayers_" + barKey, false);
+                    token.set("playersedit_" + barKey, true);
+                }
+            }
+        }
+
+        setValue(WS_API.FIELDS.CHAR_DATA.BAR_1);
+        setValue(WS_API.FIELDS.CHAR_DATA.BAR_2);
+        setValue(WS_API.FIELDS.CHAR_DATA.BAR_3);
+    };
+
     const findShifterData = (tokenObj, silent = false) => {
         //let tokenObj = getObj(selectedToken._type, selectedToken._id);
 
@@ -717,7 +823,14 @@ var WildShape = WildShape || (function() {
     };
 
     async function getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault) {
+        UTILS.debugChat("build target character data: START");
+
+        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
+        const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
+        const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
+
         // the get on _defaulttoken is async, need to wait on it
+        UTILS.debugChat("wait for token image");
         let targetImg = null;
         await UTILS.getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
             targetImg = img;
@@ -736,115 +849,97 @@ var WildShape = WildShape || (function() {
         });
 
         if (!targetImg)
-            return null;
-
-        const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
-        const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
-        const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
-
-        let data = {};
-
-        let charDataRoot;
-        let targetSize = getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
-
-        // setup token data
-        if(isTargetNpc)
         {
-            charDataRoot = config[WS_API.FIELDS.CHAR_DATA.NPC_ROOT]
-            
-            // get token size
-            if (targetSize == 0)
-            {
-                targetSize = getAttrByName(shiftData.targetCharacterId, "token_size");
-                if(!targetSize)
-                    targetSize = 0;
-            }
-
-            // NPCs shapeshifters need to cache their current HP so that we can restore it when they go back to their base shape as they don't save it in the current attribute
-            if (!isTargetDefault && shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.SETTINGS.BASE_SHAPE)
-            {
-                // cache current npc hp value
-                shifterSettings[WS_API.FIELDS.CHAR_DATA.HP_CACHE] = shiftData.token.get(charDataRoot[WS_API.FIELDS.CHAR_DATA.HP] + "_value");
-            }
+            return null;
         }
         else
         {
-            charDataRoot = config[WS_API.FIELDS.CHAR_DATA.PC_ROOT]
-
+            UTILS.debugChat("token image found");
         }
 
-        // setup basic output data
+        // NPCs shapeshifters need to cache their current HP so that we can restore it when they go back to their base shape as they don't save it in the current attribute
+        if (shifterSettings[WS_API.FIELDS.ISNPC] && !isTargetDefault && shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.SETTINGS.BASE_SHAPE)
+        {
+            UTILS.debugChat("npc hp special handling");
+
+            // cache current npc hp value
+            let npcDataRoot = config[WS_API.FIELDS.CHAR_DATA.NPC_ROOT];
+            let hpAttr = npcDataRoot[WS_API.FIELDS.CHAR_DATA.HP];
+            let hpBarValue = null;
+            
+            if (hpAttr == npcDataRoot[WS_API.FIELDS.CHAR_DATA.BAR_1])
+                hpBarValue = "bar1_value";
+            else if (hpAttr == npcDataRoot[WS_API.FIELDS.CHAR_DATA.BAR_2])
+                hpBarValue = "bar2_value";
+            else if (hpAttr == npcDataRoot[WS_API.FIELDS.CHAR_DATA.BAR_3])
+                hpBarValue = "bar3_value";
+
+            if (hpBarValue)
+            {
+                shifterSettings[WS_API.FIELDS.CHAR_DATA.HP_CACHE] = shiftData.token.get(hpBarValue);
+                UTILS.debugChat("saving " + shifterSettings[WS_API.FIELDS.CHAR_DATA.HP_CACHE] + " from " + hpBarValue);
+            }
+            else
+            {
+                UTILS.chatError("cannot save current HP, no bar value found connected to " + hpAttr + "; this is required for NPC shifters, please make sure the hp attribute is set on one of the bars for the NPC settings in the main config");
+                return null;
+            }
+        }
+
+        // get token size
+        const tokenBaseSize = 70;
+        let tokenWidth = tokenBaseSize;
+        let tokenHeight = tokenBaseSize;
+        {
+            UTILS.debugChat("get token size");
+
+            let targetSize = getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
+
+            // get token size on the auto setting
+            if (targetSize == 0)
+            {
+                if(isTargetNpc)
+                {
+                    targetSize = getAttrByName(shiftData.targetCharacterId, "token_size");
+                    if(!targetSize)
+                        targetSize = 0;
+                }
+                else
+                {
+                    await UTILS.getDefaultTokenSize(shiftData.targetCharacter).then((ret) => { 
+                        if (ret.width > 0) 
+                            tokenWidth = ret.width;
+                        if (ret.height > 0) 
+                            tokenHeight = ret.height}
+                    );
+                }
+            }
+
+            if (targetSize > 1)
+            {
+                tokenWidth = tokenBaseSize * targetSize;
+                tokenHeight = tokenBaseSize * targetSize;
+            }
+        }
+           
+        // setup output data
+        let data = {};
         {
             data.imgsrc = targetImg;
             data.characterId = shiftData.targetCharacterId;
             data.controlledby = shiftData.shifterControlledby;
-            data.tokenSize = targetSize == 0 ? 1 : targetSize;
+            data.tokenWidth = tokenWidth;
+            data.tokenHeight = tokenHeight;
         }
 
-        // setup token bar values 
-        let hpAttr    = charDataRoot[WS_API.FIELDS.CHAR_DATA.HP];
-        let speedAttr = charDataRoot[WS_API.FIELDS.CHAR_DATA.SPEED];
-
-        function setupTokenBarValue(fieldId)
-        {
-            let attrName = charDataRoot[fieldId];
-            if (attrName && attrName !== "")
-            {
-                let obj = findObjs({type: "attribute", characterid: shiftData.targetCharacterId, name: attrName})[0];
-                if(obj)
-                {
-                    data[fieldId]             = {};
-                    data[fieldId].id          = obj.id;
-                    data[fieldId].max         = obj.get('max');                                       
-                    
-                    let currValue = obj.get('current');
-
-                    // HP SPECIAL HANDLING
-                    if (attrName == hpAttr)
-                    {
-                        if (isTargetDefault)
-                        {
-                            // NPC ShapeShifter don't store the current in hp and need special handling to restore hp when going back to original form
-                            if(shifterSettings[WS_API.FIELDS.ISNPC])
-                            {
-                                currValue = shifterSettings[WS_API.FIELDS.CHAR_DATA.HP_CACHE];
-                            }
-                        }
-                        else
-                        {
-                            // always restore the max unless we are going back to the default Shape
-                            currValue = data[fieldId].max;
-                        }
-                    }
-                    // SPEED SPECIAL HANDLING
-                    else if (attrName == speedAttr && ((!_.isNumber(currValue)) && currValue.indexOf(' ') > 0))
-                    {
-                        // "speed" can have multiple values, just display the first number/word before the space
-                        currValue = currValue.split(' ')[0];
-                    }
-
-                    // set value
-                    data[fieldId].current = currValue;
-
-                    return true;
-                }
-                else
-                {
-                    UTILS.chatErrorToPlayer(shiftData.who, "setting value on token bar, cannot find attribute [" + attrName + "] on character: " + shiftData.targetCharacterId);
-                    return false;
-                }
-            }
-            else
-                return true;
-        }
-
-        if (!setupTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_1)) return false;
-        if (!setupTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_2)) return false;
-        if (!setupTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_3)) return false;
+        // setup values for bar 1/2/3 on token
+        data.barData = getTokenBarData(shifterSettings, shiftData.targetCharacterId, isTargetDefault, isTargetNpc);
 
         // setup senses
         if (config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
         {
+            UTILS.debugChat("setup senses");
+
             let senses = {};
 
             if (targetData[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
@@ -887,6 +982,7 @@ var WildShape = WildShape || (function() {
             data.senses = senses;
         }
 
+        UTILS.debugChat("build target character data: DONE");
         return data;
     }
 
@@ -1081,7 +1177,10 @@ var WildShape = WildShape || (function() {
         await getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault).then((ret) => { targetData = ret; });
 
         if (!targetData)
+        {
+            UTILS.debugChat("cannot get target character data, aborting");
             return false;
+        }
 
         if (isTargetNpc)
         {
@@ -1093,37 +1192,11 @@ var WildShape = WildShape || (function() {
         }
 
         // set bar values
-        function setTokenBarValue(barKey)
-        {
-            if (targetData[barKey])
-            {
-                if(targetData[barKey].id)
-                    shiftData.token.set(barKey + "_link", targetData[barKey].id);
-                
-                if(targetData[barKey].current)
-                    shiftData.token.set(barKey  + "_value", targetData[barKey].current);
-
-                if(targetData[barKey].max)
-                    shiftData.token.set(barKey  + "_max", targetData[barKey].max);
-
-                // we need to turn bar visibility on if the target is controlled by a player
-                if (targetData.controlledby.length > 0)
-                {
-                    shiftData.token.set("showplayers_" + barKey, false);
-                    shiftData.token.set("playersedit_" + barKey, true);
-                }
-            }
-        }
-
-        setTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_1);
-        setTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_2);
-        setTokenBarValue(WS_API.FIELDS.CHAR_DATA.BAR_3);
+        setTokenBarValues(shiftData.token, targetData.barData, targetData.controlledby, isTargetNpc);
 
         // force roll settings when we are changing into another shape
         if (!isTargetDefault)
         {
-
-
             let targetDataRoot = shifterSettings[WS_API.FIELDS.ISNPC] ? config[WS_API.FIELDS.CHAR_DATA.NPC_ROOT] : config[WS_API.FIELDS.CHAR_DATA.PC_ROOT];
 
             if (targetDataRoot[WS_API.FIELDS.CHAR_DATA.FORCEROLL_NEVER_WHISPER])
@@ -1153,14 +1226,12 @@ var WildShape = WildShape || (function() {
                 tokenPageScale = snapping_increment;
         }
 
-        let tokenBaseSize = 70 * tokenPageScale;
-
         // set other token data
         shiftData.token.set({
             imgsrc: targetData.imgsrc,
             represents: targetData.characterId,
-            height: tokenBaseSize * targetData.tokenSize,
-            width: tokenBaseSize * targetData.tokenSize,
+            height: targetData.tokenHeight * tokenPageScale,
+            width: targetData.tokenWidth * tokenPageScale,
         });
 
         // set token sense
@@ -1691,7 +1762,15 @@ var WildShape = WildShape || (function() {
             }
             break;
 
-            case WS_API.FIELDS.CHAR_DATA.ROOT:
+            case WS_API.FIELDS.ENABLE_DEBUG:
+            {
+                config[WS_API.FIELDS.ENABLE_DEBUG] = !config[WS_API.FIELDS.ENABLE_DEBUG];
+                UTILS.debugEnable(config[WS_API.FIELDS.ENABLE_DEBUG])
+                MENU.updateConfig();
+            }
+            break;
+
+            case WS_API.FIELDS.TARGET.CHAR_DATA:
             {
                 const dataRoot = args.shift();
                 if (dataRoot == WS_API.FIELDS.CHAR_DATA.PC_ROOT || dataRoot == WS_API.FIELDS.CHAR_DATA.NPC_ROOT)
@@ -1967,6 +2046,7 @@ var WildShape = WildShape || (function() {
             obj.ignoreDruidResource = true;
             obj.who = "gm";
             obj.targetShapeName = shifterSettings[WS_API.FIELDS.CURRENT_SHAPE];
+
             if (obj.targetShapeName != WS_API.SETTINGS.BASE_SHAPE)
             {
                 obj.targetShape = obj.shifter[WS_API.FIELDS.SHAPES][obj.targetShapeName];
@@ -1983,9 +2063,14 @@ var WildShape = WildShape || (function() {
                     }
                     else 
                     {
-                        UTILS.chatError("Dropping shifter token, cannot transform " + obj.shifterId + " into " + obj.targetShapeName);                        
+                        UTILS.chatError("Dropping shifter token, cannot transform " + obj.shifterId + " into " + obj.targetShapeName);
                     }
                 });
+            }
+            else
+            {
+                // make sure bars are setup properly on token drop
+                setTokenBarValues(token, getTokenBarData(shifterSettings, obj.shifterCharacterId, true, shifterSettings[WS_API.FIELDS.ISNPC]), obj.shifterControlledby);
             }
         }
     };
@@ -2108,7 +2193,7 @@ var WildShape = WildShape || (function() {
             // upgrade token bar data from HP/AC/SPEED to BAR1/2/3 settings
             let tokenDataRoot = config[WS_API.DEPRECATED.TOKEN_DATA.ROOT];
 
-            function upgradeTokenDataValue(tokenKey, dataRoot, dataKey)
+            function upgradeTokenDataValue(dataRoot, tokenKey, dataKey)
             {
                 let barIndex = tokenDataRoot[tokenKey];
                 if (barIndex == WS_API.FIELDS.CHAR_DATA.BAR_1 || barIndex == WS_API.FIELDS.CHAR_DATA.BAR_2 || barIndex == WS_API.FIELDS.CHAR_DATA.BAR_3)
@@ -2119,14 +2204,44 @@ var WildShape = WildShape || (function() {
                 }
             }
 
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.HP,      pcDataRoot,  WS_API.DEPRECATED.PC_DATA.HP);
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.AC,      pcDataRoot,  WS_API.DEPRECATED.PC_DATA.AC);
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.SPEED,   pcDataRoot,  WS_API.DEPRECATED.PC_DATA.SPEED);
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.HP,      npcDataRoot, WS_API.DEPRECATED.NPC_DATA.HP);
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.AC,      npcDataRoot, WS_API.DEPRECATED.NPC_DATA.AC);
-            upgradeTokenDataValue(WS_API.DEPRECATED.TOKEN_DATA.SPEED,   npcDataRoot, WS_API.DEPRECATED.NPC_DATA.SPEED);
+            upgradeTokenDataValue(pcDataRoot,  WS_API.DEPRECATED.TOKEN_DATA.HP,    WS_API.DEPRECATED.PC_DATA.HP);
+            upgradeTokenDataValue(pcDataRoot,  WS_API.DEPRECATED.TOKEN_DATA.AC,    WS_API.DEPRECATED.PC_DATA.AC);
+            upgradeTokenDataValue(pcDataRoot,  WS_API.DEPRECATED.TOKEN_DATA.SPEED, WS_API.DEPRECATED.PC_DATA.SPEED);
+            upgradeTokenDataValue(npcDataRoot, WS_API.DEPRECATED.TOKEN_DATA.HP,    WS_API.DEPRECATED.NPC_DATA.HP);
+            upgradeTokenDataValue(npcDataRoot, WS_API.DEPRECATED.TOKEN_DATA.AC,    WS_API.DEPRECATED.NPC_DATA.AC);
+            upgradeTokenDataValue(npcDataRoot, WS_API.DEPRECATED.TOKEN_DATA.SPEED, WS_API.DEPRECATED.NPC_DATA.SPEED);
 
             delete config[WS_API.DEPRECATED.TOKEN_DATA.ROOT];
+        }
+
+        if (UTILS.compareVersion(currentVersion, "1.4.1") < 0)
+        {
+            // updated separator to make commands more readable
+            if (config.SEP == "###")
+                config.SEP = newConfig.SEP;
+
+            // new enable debug field
+            config[WS_API.FIELDS.ENABLE_DEBUG] = false;
+
+            // make sure all defaults for fields added in 1.4.0 are properly set
+            {
+                function setCharDataDefault(dataRoot, key, val)
+                {
+                    if (dataRoot[key] == null || dataRoot[key] == "" || reset)
+                    {
+                        dataRoot[key] = val;
+                    }
+                }
+
+                let pcDataRoot = config[WS_API.FIELDS.CHAR_DATA.PC_ROOT];
+                let npcDataRoot = config[WS_API.FIELDS.CHAR_DATA.NPC_ROOT];
+
+                setCharDataDefault(pcDataRoot, WS_API.FIELDS.CHAR_DATA.HP, WS_API.DEFAULT_CONFIG.PC_DATA.HP);
+                setCharDataDefault(pcDataRoot, WS_API.FIELDS.CHAR_DATA.SPEED, WS_API.DEFAULT_CONFIG.PC_DATA.SPEED);
+                setCharDataDefault(npcDataRoot, WS_API.FIELDS.CHAR_DATA.HP, WS_API.DEFAULT_CONFIG.NPC_DATA.HP);
+                setCharDataDefault(npcDataRoot, WS_API.FIELDS.CHAR_DATA.SPEED, WS_API.DEFAULT_CONFIG.NPC_DATA.SPEED);
+                setCharDataDefault(npcDataRoot, WS_API.FIELDS.CHAR_DATA.SENSES, WS_API.DEFAULT_CONFIG.NPC_DATA.SENSES);
+            }
         }
 
         config.VERSION = WS_API.VERSION;
@@ -2137,7 +2252,7 @@ var WildShape = WildShape || (function() {
         let oldVersionDetected = null;
         let apiState = state[WS_API.STATENAME];
 
-
+        // check for basic state
         if(!apiState || typeof apiState !== 'object' || reset)
         {
             if(state[WS_API.STATENAME])
@@ -2154,21 +2269,33 @@ var WildShape = WildShape || (function() {
             apiState = state[WS_API.STATENAME];
             reset = true;
         }
+ 
+        // check version
+        let config = apiState[WS_API.DATA_CONFIG];
 
         if (!apiState[WS_API.DATA_CONFIG] || typeof apiState[WS_API.DATA_CONFIG] !== 'object' || reset) 
         {
             apiState[WS_API.DATA_CONFIG] = WS_API.DEFAULT_CONFIG;
             apiState[WS_API.DATA_CONFIG].VERSION = WS_API.VERSION;
+            config = apiState[WS_API.DATA_CONFIG];
             reset = true;
-        }        
+        }
         else if (UTILS.compareVersion(apiState[WS_API.DATA_CONFIG].VERSION, WS_API.VERSION) < 0)
         {
             oldVersionDetected = apiState[WS_API.DATA_CONFIG].VERSION;
             upgradeVersion();
         }
 
+        // validate separator
+        if (!config.SEP || config.SEP == "" || reset)
+        {
+            UTILS.debugLog("resetting separator");
+            config.SEP = WS_API.DEFAULT_CONFIG.SEP;
+        }
+
         if (!apiState[WS_API.DATA_SHIFTERS] || typeof apiState[WS_API.DATA_SHIFTERS] !== 'object' || reset)
         {
+            UTILS.debugLog("resetting DATA_SHIFTERS");
             apiState[WS_API.DATA_SHIFTERS] = {};
         }
 

@@ -7,9 +7,13 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.3.2";
+        this.VERSION = "1.3.3";
         this.DEBUG = isDebug;
         this.DEBUG_CACHE = "";
+    }
+
+    debugEnable(enable = true) {
+        this.DEBUG = enable;
     }
 
     debugFlush(msg="") {
@@ -49,6 +53,14 @@ class WildUtils {
     chatErrorToPlayer(who, msg, callback = null, settings = {noarchive:true}) {
        sendChat(this.APINAME, "/w " + who + " ERROR: " + msg, callback, settings);
        this.chatError("chatErrorToPlayer: " + who + ", msg: " + msg);
+    }
+
+    debugLog(msg)
+    {
+        if (this.DEBUG)
+        {
+            log(this.APINAME + ": " + msg);
+        }
     }
     
     sleep(ms) {
@@ -401,6 +413,21 @@ class WildUtils {
         });
 
         return img;
+    }
+
+    async getDefaultTokenSize(character) {
+        let w = 0;
+        let h = 0;
+
+        await this.getDefaultToken(character).then((token) => {
+            if (token)
+            {
+                w = token.width;
+                h = token.height;
+            }
+        });
+
+        return { "width" : w, "height" : h };
     }
 
     async duplicateCharacter(targetCharacter, newCharacterName) {
