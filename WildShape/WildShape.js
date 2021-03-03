@@ -11,7 +11,7 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.4.1",
+    VERSION : "1.4.2",
     REQUIRED_HELPER_VERSION: "1.3.3",
 
     STATENAME : "WILDSHAPE",
@@ -426,8 +426,6 @@ class WildShapeMenu extends WildMenu
 
         const shifter = state[WS_API.STATENAME][WS_API.DATA_SHIFTERS][shifterId];
 
-        let npcs = this.UTILS.getNPCNames().sort().join('|');
-
         let obj = shifter[WS_API.FIELDS.SHAPES][shapeId];
         if(!obj)
         {
@@ -532,9 +530,6 @@ class WildShapeMenu extends WildMenu
             listItems.push(this.makeLabel(shifterId + (shifterSettings[WS_API.FIELDS.ISNPC] ? " <i>(NPC)</i>" : " <i>(PC)</i>")) + this.makeRightButton("Del", cmdRemove + "?{Are you sure you want to delete " + shifterId + "?|no|yes}" + this.SEP + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + shifterId)+ this.makeRightButton("Edit", cmdShifterEdit + shifterId));
         });
 
-        let pcs = this.UTILS.getPCNames().sort().join('|');
-        let npcs = this.UTILS.getNPCNames().sort().join('|');
-
         const addShifterButton = this.makeButton("Add ShapeShifter", cmdShifterAdd + "&#64;{target|token_id}", ' width: 100%');
         //const importShifterButton = this.makeButton("Import Shifter", cmdImport + WS_API.FIELDS.TARGET.SHIFTER + this.SEP + "?{Shifter Data}", ' width: 100%');
 
@@ -615,6 +610,10 @@ var WildShape = WildShape || (function() {
     'use strict';
     let MENU = new WildShapeMenu();
     let UTILS = new WildUtils(WS_API.NAME, state[WS_API.STATENAME][WS_API.DATA_CONFIG][WS_API.FIELDS.ENABLE_DEBUG]);
+
+    const validateSeparator = (sep) => {
+        return sep && typeof(sep) === 'string' && sep !== "" && !sep.match(/[.*+?^${}()|[\]\\]/g);
+    };
 
     const sortShifters = () => {
         // order shifters
@@ -1450,6 +1449,7 @@ var WildShape = WildShape || (function() {
             else
             {
                 UTILS.chatError("Cannot find character [" + shapeName + "] in the journal");
+                UTILS.chatError("If you see a list in the error above please make sure the last character in the list doesn't have any double quotes \" in the name, you can replace those with single quotes ' ");
             }
         }
         else
@@ -1760,8 +1760,16 @@ var WildShape = WildShape || (function() {
         {
             case WS_API.FIELDS.SEP:
             {
-                config.SEP = args.shift();
-                MENU.updateConfig();
+                let newSEP = args.shift();
+                if (validateSeparator(newSEP))
+                {
+                    config.SEP = newSEP;
+                    MENU.updateConfig();
+                }
+                else
+                {
+                    UTILS.chatError("invalid new separator specified, empty strings and special chars are not supported");
+                }
             }
             break;
 
@@ -2230,7 +2238,7 @@ var WildShape = WildShape || (function() {
             {
                 function setCharDataDefault(dataRoot, key, val)
                 {
-                    if (dataRoot[key] == null || dataRoot[key] == "" || reset)
+                    if (dataRoot[key] == null || dataRoot[key] == "" || typeof(dataRoot[key]) !== typeof(val))
                     {
                         dataRoot[key] = val;
                     }
@@ -2290,7 +2298,7 @@ var WildShape = WildShape || (function() {
         }
 
         // validate separator
-        if (!config.SEP || config.SEP == "" || reset)
+        if (!validateSeparator(config.SEP) || reset)
         {
             UTILS.debugLog("resetting separator");
             config.SEP = WS_API.DEFAULT_CONFIG.SEP;
