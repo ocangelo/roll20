@@ -11,7 +11,7 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.4.3",
+    VERSION : "1.4.2",
     REQUIRED_HELPER_VERSION: "1.3.3",
 
     STATENAME : "WILDSHAPE",
