@@ -7,29 +7,62 @@
 class WildUtils {
     constructor(apiName, isDebug = false) {
         this.APINAME = apiName || "API";
-        this.VERSION = "1.3.3";
-        this.DEBUG = isDebug;
-        this.DEBUG_CACHE = "";
+        this.VERSION = "1.3.4";
+
+        this.debugEnable(isDebug);
     }
 
     debugEnable(enable = true) {
         this.DEBUG = enable;
+        this.DEBUG_CACHE = null;
+        this.DEBUG_IMMEDIATE = true;
+        //this.DEBUG_IMMEDIATE = immediate;
     }
 
-    debugFlush(msg="") {
+    debugFlush(msg = null) {
         if (this.DEBUG)
         {
-            sendChat(this.APINAME, "/w gm " + msg + ": " + this.DEBUG_CACHE, null, {noarchive:true});
-            this.DEBUG_CACHE = "";
+            if (msg !== null)
+                this.DEBUG_CACHE = ((this.DEBUG_CACHE !== null) ? (this.DEBUG_CACHE + "<br>") : "") + msg;
+
+            if(this.DEBUG_CACHE !== null)
+            {
+                this.chat(this.DEBUG_CACHE);
+                this.DEBUG_CACHE = null;
+            }
         }
     }
 
-    debugChat(msg, flush = true) {
-        if (this.DEBUG)
+    debugChat(msg, cacheMsg = null) {
+        if (this.DEBUG && msg !== null)
         {
-            this.DEBUG_CACHE += (this.DEBUG_CACHE !== "" ? "<br>" : "") + msg;
-            if (flush)
-                this.debugFlush();
+            if (this.DEBUG_IMMEDIATE)
+            {
+                this.chat(msg);
+            }
+            else if (cacheMsg === null)
+            {
+                if (this.DEBUG_CACHE == null)
+                    this.chat(msg);
+                else
+                    this.DEBUG_CACHE += "<br>" + msg;
+            }
+            else 
+            {
+                if (cacheMsg === true)
+                {
+                    this.DEBUG_CACHE = ((this.DEBUG_CACHE !== null) ? (this.DEBUG_CACHE + "<br>") : "") + msg;
+                }
+                else 
+                {
+                    if (this.DEBUG_CACHE !== null)
+                    {
+                        this.debugFlush();
+                    }
+
+                    this.chat(msg);
+                }
+            }
         }
     }
 
@@ -187,15 +220,19 @@ class WildUtils {
         let fromAttrCurrent = fromAttr ? fromAttr.get("current") : defaultValue;
         let toAttr = findObjs({_type: "attribute", name: toAttrName, _characterid: toId})[0];
         if (!toAttr) {
+            this.debugChat("copyAttribute: creating " + toAttrName + ", value = " + fromAttrCurrent);
             createObj('attribute', {
                 characterid: toId,
-                name: toName,
+                name: toAttrName,
                 current: fromAttrCurrent,
-                max: fromAttr.get("max")
+                max: fromAttr ? fromAttr.get("max") : null
             });
         }
         else
+        {
+            this.debugChat("copyAttribute: setting " + toAttrName + ", value = " + fromAttrCurrent);
             toAttr.set("current", fromAttrCurrent);
+        }
     }
 
     isProficient(charId, attrName) {

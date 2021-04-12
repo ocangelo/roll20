@@ -11,8 +11,8 @@
 
 const WS_API = {
     NAME : "WildShape",
-    VERSION : "1.4.2.1",
-    REQUIRED_HELPER_VERSION: "1.3.3",
+    VERSION : "1.4.2.2",
+    REQUIRED_HELPER_VERSION: "1.3.4",
 
     STATENAME : "WILDSHAPE",
 
@@ -825,14 +825,14 @@ var WildShape = WildShape || (function() {
     };
 
     async function getTargetCharacterData(shiftData, isTargetNpc, isTargetDefault) {
-        UTILS.debugChat("build target character data: START");
+        UTILS.debugChat("BUILDING TARGET CHARACTER DATA: START", true);
 
         const config = state[WS_API.STATENAME][WS_API.DATA_CONFIG];
         const shifterSettings = shiftData.shifter[WS_API.FIELDS.SETTINGS];
         const targetData = shiftData.targetShape ? shiftData.targetShape : shifterSettings;
 
         // the get on _defaulttoken is async, need to wait on it
-        UTILS.debugChat("wait for token image");
+        UTILS.debugChat("--- wait for token image");
         let targetImg = null;
         await UTILS.getDefaultTokenImage(shiftData.targetCharacter).then((img) => {
             targetImg = img;
@@ -844,7 +844,6 @@ var WildShape = WildShape || (function() {
 
                 if (!targetImg || targetImg.trim() == "")
                 {
-                    UTILS.chatErrorToPlayer(shiftData.who, "cannot use image with marketplace link, the image needs to be re-uploaded into the library and set on the target character as either token or avatar image; character id = " + shiftData.targetCharacterId);
                     targetImg = null;
                 }
             }
@@ -852,6 +851,8 @@ var WildShape = WildShape || (function() {
 
         if (!targetImg)
         {
+            UTILS.debugFlush();
+            UTILS.chatErrorToPlayer(shiftData.who, "cannot use image with marketplace link, the image needs to be re-uploaded into the library and set on the target character as either token or avatar image; character id = " + shiftData.targetCharacterId);
             return null;
         }
         else
@@ -862,7 +863,7 @@ var WildShape = WildShape || (function() {
         // NPCs shapeshifters need to cache their current HP so that we can restore it when they go back to their base shape as they don't save it in the current attribute
         if (shifterSettings[WS_API.FIELDS.ISNPC] && !isTargetDefault && shifterSettings[WS_API.FIELDS.CURRENT_SHAPE] == WS_API.SETTINGS.BASE_SHAPE)
         {
-            UTILS.debugChat("npc hp special handling");
+            UTILS.debugChat("--- npc hp special handling");
 
             // cache current npc hp value
             let npcDataRoot = config[WS_API.FIELDS.CHAR_DATA.NPC_ROOT];
@@ -883,6 +884,7 @@ var WildShape = WildShape || (function() {
             }
             else
             {
+                UTILS.debugFlush();
                 UTILS.chatError("cannot save current HP, no bar value found connected to " + hpAttr + "; this is required for NPC shifters, please make sure the hp attribute is set on one of the bars for the NPC settings in the main config");
                 return null;
             }
@@ -893,9 +895,7 @@ var WildShape = WildShape || (function() {
         let tokenWidth = tokenBaseSize;
         let tokenHeight = tokenBaseSize;
         {
-            UTILS.debugChat("get token size");
-
-            let targetSize = getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
+           let targetSize = getCreatureSize(targetData[WS_API.FIELDS.SIZE]);
 
             // get token size on the auto setting
             if (targetSize == 0)
@@ -922,6 +922,8 @@ var WildShape = WildShape || (function() {
                 tokenWidth = tokenBaseSize * targetSize;
                 tokenHeight = tokenBaseSize * targetSize;
             }
+
+            UTILS.debugChat("--- tokenTargetSize: " + targetSize); 
         }
            
         // setup output data
@@ -940,7 +942,7 @@ var WildShape = WildShape || (function() {
         // setup senses
         if (config[WS_API.FIELDS.SENSES.ROOT][WS_API.FIELDS.SENSES.OVERRIDE])
         {
-            UTILS.debugChat("setup senses");
+            UTILS.debugChat("--- setting up senses");
 
             let senses = {};
 
@@ -984,7 +986,8 @@ var WildShape = WildShape || (function() {
             data.senses = senses;
         }
 
-        UTILS.debugChat("build target character data: DONE");
+        UTILS.debugFlush("BUILDING TARGET CHARACTER DATA: DONE", true);
+
         return data;
     }
 
@@ -1009,7 +1012,7 @@ var WildShape = WildShape || (function() {
             // target could have proficiency in a stat we don't, default to that proficiency bonus
             let statPb = profData.shapeStatValue - profData.shapeStatMod;
             const isProficient = UTILS.isProficient(profData.druidId, profData.druidStatName + WS_API.SETTINGS.STATS.SUFFIX.PROF);
-            UTILS.debugChat("-- stat " + profData.shapeStatName + ": " + profData.shapeStatValue.toString() + ", npc pb: " + statPb + ", npc mod " + profData.shapeStatMod + ", druid pb: " + (isProficient ? profData.druidPb : 0), false);
+            UTILS.debugChat("stat " + profData.shapeStatName + ": " + profData.shapeStatValue.toString() + ", npc pb: " + statPb + ", npc mod: " + profData.shapeStatMod + ", druid pb: " + (isProficient ? profData.druidPb : 0));
 
             // check which proficiency bonus we should use
             if (isProficient && profData.druidPb > statPb)
@@ -1020,10 +1023,14 @@ var WildShape = WildShape || (function() {
             // update stat value based on current modifier and best proficiency
             const newShapeStatValue = profData.statMod + statPb;
             const oldShapeStatValue = Number(shapeStatAttr.get("current"));
-            if (newShapeStatValue !== oldShapeStatValue || shapeStatAttr.get("current") == "")
+            if (newShapeStatValue != oldShapeStatValue || shapeStatAttr.get("current") == "")
             {
+                if (shapeStatAttr.get("current") == "")
+                    UTILS.debugChat("SETTING " + profData.shapeStatName + ": to " + newShapeStatValue);
+                else
+                    UTILS.debugChat("CHANGING " + profData.shapeStatName + ": from " + oldShapeStatValue + " to " + newShapeStatValue);
+
                 shapeStatAttr.set("current", newShapeStatValue);
-                UTILS.debugChat("-- CHANGING -- " + profData.shapeStatName + " from " + oldShapeStatValue + " to: " + newShapeStatValue.toString(), false);
 
                 // also set _base value
                 UTILS.setAttribute(profData.shapeId, profData.shapeStatName + WS_API.SETTINGS.STATS.SUFFIX.BASE, (newShapeStatValue > 0 ? "+" : "") + newShapeStatValue.toString());
@@ -1054,8 +1061,10 @@ var WildShape = WildShape || (function() {
         let targetCharacter = shiftData.targetCharacter;
         let targetShape = shiftData.targetShape;
 
+        UTILS.debugChat("COPYING DRUID DATA: START", true);
+
         // copy attributes
-        UTILS.debugChat("copying druid attributes");
+        UTILS.debugChat("--- copying attributes");
 
         _.each(STATS.DRUID_COPY_ATTR, function (attrName) {
             UTILS.copyAttribute(druidCharacterId, attrName, targetCharacterId, attrName, 10);
@@ -1064,13 +1073,15 @@ var WildShape = WildShape || (function() {
         });
 
         // copy proficiencies
+        UTILS.debugChat("--- copying proficiencies");
+
         let profData = {};
         profData.druidId = druidCharacterId;
         profData.shapeId = targetCharacterId;
 
         let druidPb  = findObjs({_type: "attribute", name: STATS.PROF, _characterid: druidCharacterId})[0];
         profData.druidPb = druidPb ? Number(druidPb.get("current")) : 0;
-        UTILS.debugChat("druid pb: " + profData.druidPb, false);
+        UTILS.debugChat("druid pb: " + profData.druidPb);
 
         for (let statIndex = 0; statIndex < 6; ++statIndex)
         {
@@ -1098,8 +1109,6 @@ var WildShape = WildShape || (function() {
             });
         }
 
-        UTILS.debugFlush("copying druid proficiencies");
-
         // npc saving/skills flag
         let npc_attr_flag = findObjs({_type: "attribute", name: "npc_saving_flag", _characterid: targetCharacterId})[0];
         if (npc_attr_flag)
@@ -1112,6 +1121,8 @@ var WildShape = WildShape || (function() {
         {
             npc_attr_flag.set("current", 1);
         }
+
+        UTILS.debugFlush("COPYING DRUID DATA : DONE");
     };
 
     async function doShapeShift(shiftData) {
@@ -1776,7 +1787,7 @@ var WildShape = WildShape || (function() {
             case WS_API.FIELDS.ENABLE_DEBUG:
             {
                 config[WS_API.FIELDS.ENABLE_DEBUG] = !config[WS_API.FIELDS.ENABLE_DEBUG];
-                UTILS.debugEnable(config[WS_API.FIELDS.ENABLE_DEBUG])
+                UTILS.debugEnable(config[WS_API.FIELDS.ENABLE_DEBUG]);
                 MENU.updateConfig();
             }
             break;
